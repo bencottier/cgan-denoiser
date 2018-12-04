@@ -2,21 +2,26 @@
 """
 UNet 2D Keras Cartilage Segmentation.
 
-Iniitial UNet and DSC functions from github.com/jocicmarko/ultrasound-nerve-segmentation. MIT Liense
+Initial UNet and DSC functions from github.com/jocicmarko/ultrasound-nerve-segmentation. MIT License
 
 Created on Wed May 23 13:56:26 2018
 
 @author: uqscha22
 """
+from __future__ import print_function, division
+import data_processing as dp
+import filenames
 import numpy as np
 from keras.models import Model
 from keras.layers import Input, concatenate, Conv2D, MaxPooling2D, Conv2DTranspose
 from keras.optimizers import Adam
 from keras import backend as K
 from keras.callbacks import ModelCheckpoint
-import filenames
 import nibabel as nib #loading Nifti images
 import time
+
+def normalise(img, rng=(-1, 1)):
+    return (rng[1] - rng[0])*(img-img.min())/(img.max()-img.min()) - rng[0]
 
 def dice_coef(y_true, y_pred):
     smooth = 1.
@@ -34,6 +39,15 @@ def dice_coef_numpy(y_true, y_pred):
 
 def dice_coef_loss(y_true, y_pred):
     return -dice_coef(y_true, y_pred)
+
+def rms(y_true, y_pred):
+    return K.sqrt(K.mean(K.square(y_true - y_pred)))
+
+def rms_numpy(y_true, y_pred):
+    return np.sqrt(np.mean((y_true - y_pred)**2))
+
+def rms_loss(y_true, y_pred):
+    return rms(y_true, y_pred)
 
 def preprocess(img, N):
     img = np.flipud(img) #flipped x-axis when reading
@@ -134,18 +148,19 @@ def get_unet_lowres(img_rows, img_cols):
     conv9 = Conv2D(8, (3, 3), activation='relu', padding='same')(up9)
     conv9 = Conv2D(8, (3, 3), activation='relu', padding='same')(conv9)
 
-    conv10 = Conv2D(1, (1, 1), activation='sigmoid')(conv9)
+    conv10 = Conv2D(1, (1, 1), activation='linear')(conv9)
 
     model = Model(inputs=[inputs], outputs=[conv10])
 
-    model.compile(optimizer=Adam(lr=1e-5), loss=dice_coef_loss, metrics=[dice_coef])
+    # model.compile(optimizer=Adam(lr=1e-5), loss=dice_coef_loss, metrics=[dice_coef])
+    model.compile(optimizer=Adam(lr=1e-5), loss=rms_loss, metrics=[rms])
 
     return model
 
 if __name__ == '__main__':
     
-    #parameters
-#    leaveOut = [1, 3, 4, 6, 10, 12, 50, 100, 120, 140, 145, 150, 151, 152, 160, 200, 210, 300, 350, 351]
+    # Parameters
+    # leaveOut = [1, 3, 4, 6, 10, 12, 50, 100, 120, 140, 145, 150, 151, 152, 160, 200, 210, 300, 350, 351]
     leaveOut = [1, 3, 4, 6, 10, 12, 50, 100, 120, 140, 145, 150, 151, 152]
     batch_size = 10
     maxTrainingCases = 150
@@ -153,14 +168,20 @@ if __name__ == '__main__':
     N = 256
     iterations = 100
     
-    #load MR data
-    path = "slices_pad/"
+    # Load MR data
+    root_path = "/home/ben/projects/honours/datasets/oasis1/"
+    input_path = root_path + "slices_artefact/"  # "slices_pad/"
+    label_path = root_path + "slices_pad/"  # "slices_seg_pad/"
+
+    # (inputs, labels), (train_inputs, train_labels) = dp.get_dataset(
+    #     input_path, label_path, leaveOut, maxTrainingCases, N)
+
     #get list of filenames and case IDs from path where 3D volumes are
-    imageList, caseList = filenames.getSortedFileListAndCases(path, 0, "*.nii.gz", True)
+    imageList, caseList = filenames.getSortedFileListAndCases(input_path, 0, "*.nii.gz", True)
 #    print(imageList)
-    print(caseList)
+    print("Cases: {}".format(caseList))
     #load label data
-    label_path = "slices_seg_pad/"
+
     #get list of filenames and case IDs from path where 3D volumes are
     manualList, caseList = filenames.getSortedFileListAndCases(label_path, 0, "*.nii.gz", True)
 #    print(manualList)
@@ -210,14 +231,14 @@ if __name__ == '__main__':
         print("Loaded", manual)
 
         if count in leaveOut:
-            testImgs[outCount] = img
-            testLabels[outCount] = label
+            testImgs[outCount] = normalise(img)
+            testLabels[outCount] = normalise(label)
             count += 1
             outCount += 1
             continue
-            
-        imgs[i] = img
-        labels[i] = label
+
+        imgs[i] = normalise(img)
+        labels[i] = normalise(label)
         i += 1 
         count += 1
         
@@ -228,44 +249,69 @@ if __name__ == '__main__':
     testImgs = testImgs[..., np.newaxis]
     testLabels = testLabels[..., np.newaxis]
     print("Used", i, "images for training")
-        
-    print("Training ...")
-    start = time.time() #time generation
+
+    
 #    model = get_unet(image_rows, image_cols)
     model = get_unet_lowres(image_rows, image_cols)
-    model_checkpoint = ModelCheckpoint('weights.h5', monitor='val_loss', save_best_only=True)
     
-    model.fit(imgs, labels, batch_size=batch_size, nb_epoch=iterations, verbose=1, shuffle=True,
+    print("Training ...")
+    model_checkpoint = ModelCheckpoint('model/weights.h5', monitor='val_loss', save_best_only=True)
+    start = time.time() #time generation
+    model.fit(imgs, labels, batch_size=batch_size, epochs=iterations, verbose=1, shuffle=True,
               validation_split=validation_split,
               callbacks=[model_checkpoint]) #with callback
-    model.fit(imgs, labels, batch_size=batch_size, nb_epoch=iterations, verbose=1, shuffle=True,
-              validation_split=validation_split)
+    # model.fit(imgs, labels, batch_size=batch_size, epochs=iterations, verbose=1, shuffle=True,
+    #           validation_split=validation_split)
     end = time.time()
     elapsed = end - start
     print("Training took " + str(elapsed) + " secs or " + str(elapsed/60) + " mins in total")
     
     print('Loading best saved weights...') #last may not be best one
-    model.load_weights('weights.h5')
+    model.load_weights('model/weights.h5')
     
     print("Testing ...")
     start = time.time() #time generation
-    segmentation = model.predict(testImgs, verbose=1)
+    prediction = model.predict(testImgs, verbose=1)
     end = time.time()
     elapsed = end - start
     print("Prediction took " + str(elapsed) + " secs or " + str(elapsed/60) + " mins in total")
 
-    dscs = []
+    metrics = []
     for index, val in enumerate(leaveOut):
-        dsc = dice_coef_numpy(testLabels[index].astype(np.float32), segmentation[index])
-        dscs.append(dsc)
-        print("DSC", caseList[val], dsc)
-    dscsArray = np.array(dscs)
-    print("Mean DSC:", np.mean(dscsArray))
-    print("Stddev DSC:", np.std(dscsArray))
-    print("Median DSC:", np.median(dscsArray))
+        # metric = dice_coef_numpy(testLabels[index].astype(np.float32), prediction[index])
+        metric = rms_numpy(testLabels[index].astype(np.float32), prediction[index])
+        metrics.append(metric)
+        print("Metric", caseList[val], metric)
+    metricsArray = np.array(metrics)
+    print("Mean metric:", np.mean(metricsArray))
+    print("Stddev metric:", np.std(metricsArray))
+    print("Median metric:", np.median(metricsArray))
     
-    #plot
+
+
+    # Plot
     import matplotlib.pyplot as plt
+
+    '''
+    index = 6
+    val = leaveOut[index]
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    plt.gray()
+    plt.tight_layout()
+    plt.subplot(121)
+    plt.title('Image ' + str(caseList[val]))
+    plt.imshow(testImgs[index,:,:,0])
+    plt.subplot(122)
+    plt.title('Label ' + str(caseList[val]))
+    plt.imshow(testLabels[index,:,:,0])
+    plt.show()
+
+    plt.imsave('u{}.png'.format(val), testImgs[index, :, :, 0], cmap='gray')
+    plt.imsave('g{}.png'.format(val), testLabels[index, :, :, 0], cmap='gray')
+    '''
+
     
     for index, val in enumerate(leaveOut):
         fig, ax = plt.subplots(figsize=(8, 5))
@@ -274,11 +320,12 @@ if __name__ == '__main__':
         plt.tight_layout()
         plt.subplot(131)
         plt.title('Image ' + str(caseList[val]))
-        plt.imshow(testImgs[index,:,:,0])
+        plt.imshow((testImgs[index,:,:,0] + 1))
         plt.subplot(132)
         plt.title('Label ' + str(caseList[val]))
         plt.imshow(testLabels[index,:,:,0])
         plt.subplot(133)
-        plt.title('Segmentation ' + str(caseList[val]))
-        plt.imshow(segmentation[index,:,:,0])
+        plt.title('Prediction ' + str(caseList[val]))
+        plt.imshow(prediction[index,:,:,0])
         plt.show()
+    
