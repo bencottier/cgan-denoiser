@@ -28,10 +28,10 @@ def preprocess(data, pad_size):
 
     # Ensure it is padded to square
     data_rows, data_cols = data.shape
-    print("Original shape", (data_rows, data_cols))
+    # print("Original shape", (data_rows, data_cols))
     preprocessed_data = np.zeros( (pad_size, pad_size), data.dtype)
     preprocessed_data[:data.shape[0],:data.shape[1]] = data
-    print("Padded shape", preprocessed_data.shape)
+    # print("Padded shape", preprocessed_data.shape)
     # Normalise to suitable value range
     preprocessed_data = normalise(preprocessed_data)
     return preprocessed_data
@@ -115,4 +115,4 @@ def get_dataset(input_path, label_path, test_cases, max_training_cases, size):
     test_labels = test_labels[..., np.newaxis]
     print("Used", i, "images for training")
 
-    return (inputs, labels), (test_inputs, test_labels)
+    return (inputs, labels), (test_inputs, test_labels), case_list
