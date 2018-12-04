@@ -129,7 +129,8 @@ if __name__ == '__main__':
     random_vector_for_generation = tf.random_normal([num_examples_to_generate,
                                                      noise_dim])
 
-    print("Training...", end="")
+    print("\nTraining...\n")
     train(train_dataset, EPOCHS)
-    print("done")
+    print("\nTraining done\n")
+
     checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
