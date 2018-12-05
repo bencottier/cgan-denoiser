@@ -58,10 +58,6 @@ def train_step(images):
 
 
 def train(dataset, epochs):
-    # Compile training function into a callable TensorFlow graph
-    # Speeds up execution
-    train_step = tf.contrib.eager.defun(train_step)
-
     for epoch in range(epochs):
         start = time.time()
         
@@ -134,6 +130,9 @@ if __name__ == '__main__':
                                                      noise_dim])
 
     print("\nTraining...\n")
+    # Compile training function into a callable TensorFlow graph
+    # Speeds up execution
+    train_step = tf.contrib.eager.defun(train_step)
     train(train_dataset, EPOCHS)
     print("\nTraining done\n")
 
