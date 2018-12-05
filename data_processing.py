@@ -30,7 +30,7 @@ def preprocess(data, pad_size):
     data_rows, data_cols = data.shape
     # print("Original shape", (data_rows, data_cols))
     preprocessed_data = np.zeros( (pad_size, pad_size), data.dtype)
-    preprocessed_data[:data.shape[0],:data.shape[1]] = data
+    preprocessed_data[:data_rows, :data_cols] = data
     # print("Padded shape", preprocessed_data.shape)
     # Normalise to suitable value range
     preprocessed_data = normalise(preprocessed_data)
