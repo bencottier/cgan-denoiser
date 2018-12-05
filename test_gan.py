@@ -57,7 +57,11 @@ def train_step(images):
     discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, discriminator.variables))
 
 
-def train(dataset, epochs):  
+def train(dataset, epochs):
+    # Compile training function into a callable TensorFlow graph
+    # Speeds up execution
+    train_step = tf.contrib.eager.defun(train_step)
+
     for epoch in range(epochs):
         start = time.time()
         
@@ -93,11 +97,11 @@ def generate_and_save_images(model, epoch, test_input):
         plt.axis('off')
             
     plt.savefig('image_at_epoch_{:04d}.png'.format(epoch))
-    plt.show()
+    # plt.show()
 
 
 if __name__ == '__main__':
-        # Load the dataset
+    # Load the dataset
     (train_images, train_labels), (_, _) = tf.keras.datasets.mnist.load_data()
     train_images = train_images.reshape(train_images.shape[0], 28, 28, 1).astype('float32')
     train_images = (train_images - 127.5) / 127.5  # Normalize the images to [-1, 1]
