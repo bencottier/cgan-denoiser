@@ -102,7 +102,7 @@ def generate_and_save_images(model, epoch, test_input):
 
 
 def log_loss(loss, name):
-    with tf.contrib.summary.always_record_summaries:
+    with tf.contrib.summary.always_record_summaries():
         tf.contrib.summary.scalar("loss_" + name, loss)
 
 
