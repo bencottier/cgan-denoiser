@@ -15,8 +15,8 @@ class ConfigCGAN:
     raw_size = 28
     adjust_size = 28
     train_size = 28
-    img_channel = 1
-    base_number_of_filters = 32
+    channels = 1
+    base_number_of_filters = 64
     kernel_size = (3, 3)
     strides = (2, 2)
 

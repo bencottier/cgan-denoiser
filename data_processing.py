@@ -19,6 +19,25 @@ def normalise(a, r=(-1, 1)):
     return (r[1] - r[0])*(a - a.min())/(a.max() - a.min()) - r[0]
 
 
+def next_power_2(n):
+    count = 0
+  
+    # First n in the below condition is for the case where n is 0 
+    if (n and not(n & (n - 1))): 
+        return n 
+      
+    while( n != 0): 
+        n >>= 1
+        count += 1
+      
+    return 1<<count
+
+
+def padding_power_2(shape):
+    padded_size = next_power_2(max(shape))
+    return ((padded_size - shape[0])//2, (padded_size - shape[1])//2)
+
+
 def preprocess(data, pad_size):
     """
     Process the data into an appropriate format for CNN-based models.
