@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-gan.py
+test_gan.py
 
 Testing a GAN model with Keras.
 
@@ -50,6 +50,11 @@ def train_step(images):
         gen_loss = generator_loss(generated_output)
         disc_loss = discriminator_loss(real_output, generated_output)
 
+        # Logging
+        global_step.assign_add(1)
+        log_loss(gen_loss, "generator")
+        log_loss(disc_loss, "discriminator")
+
     gradients_of_generator = gen_tape.gradient(gen_loss, generator.variables)
     gradients_of_discriminator = disc_tape.gradient(disc_loss, discriminator.variables)
 
@@ -96,7 +101,17 @@ def generate_and_save_images(model, epoch, test_input):
     # plt.show()
 
 
+def log_loss(loss, name):
+    with tf.contrib.summary.always_record_summaries:
+        tf.contrib.summary.scalar("loss_" + name, loss)
+
+
 if __name__ == '__main__':
+    # Initialise logging
+    summary_writer = tf.contrib.summary.create_file_writer('logs', flush_millis=10000)
+    summary_writer.set_as_default()
+    global_step = tf.train.get_or_create_global_step()
+
     # Load the dataset
     (train_images, train_labels), (_, _) = tf.keras.datasets.mnist.load_data()
     train_images = train_images.reshape(train_images.shape[0], 28, 28, 1).astype('float32')
