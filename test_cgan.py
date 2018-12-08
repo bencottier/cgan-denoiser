@@ -27,11 +27,13 @@ def generator_loss(generated_output):
 
 
 def discriminator_loss(real_output, generated_output):
-    # [1,1,...,1] with real output since it is true and we want our generated examples to look like it
-    real_loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=tf.ones_like(real_output), logits=real_output)
+    # [1,1,...,1] with real output since we want our generated examples to look like it
+    real_loss = tf.losses.sigmoid_cross_entropy(
+        multi_class_labels=tf.ones_like(real_output), logits=real_output)
 
     # [0,0,...,0] with generated images since they are fake
-    generated_loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=tf.zeros_like(generated_output), logits=generated_output)
+    generated_loss = tf.losses.sigmoid_cross_entropy(
+        multi_class_labels=tf.zeros_like(generated_output), logits=generated_output)
 
     total_loss = real_loss + generated_loss
 
@@ -67,8 +69,8 @@ def train(dataset, epochs):
                                  selected_examples)
         
         # saving (checkpoint) the model every 15 epochs
-        if (epoch + 1) % 15 == 0:
-            checkpoint.save(file_prefix = checkpoint_prefix)
+        if (epoch + 1) % config.save_per_epoch == 0:
+            checkpoint.save(file_prefix=checkpoint_prefix)
         
         print ('Time taken for epoch {} is {} sec'.format(epoch + 1,
                                                           time.time()-start))
@@ -89,16 +91,13 @@ def generate_and_save_images(model, epoch, test_input):
         plt.subplot(4, 4, i+1)
         plt.imshow(predictions[i, :, :, 0] * 127.5 + 127.5, cmap='gray')
         plt.axis('off')
-            
-    plt.savefig('out/test_gan/image_at_epoch_{:04d}.png'.format(epoch))
+    
+    plt.savefig(os.path.join(config.data_path, 
+                             'image_at_epoch_{:04d}.png'.format(epoch)))
     # plt.show()
 
 
 if __name__ == '__main__':
-    BUFFER_SIZE = 60000
-    BATCH_SIZE = 256
-    EPOCHS = 50
-
     # Load the dataset
     (train_images, _), (_, _) = tf.keras.datasets.mnist.load_data()
     train_images = train_images.reshape(train_images.shape[0], 
@@ -112,16 +111,15 @@ if __name__ == '__main__':
 
     train_dataset = tf.data.Dataset.from_tensor_slices((train_inputs.astype('float32'),
                                                         train_labels.astype('float32')))\
-        .shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
+        .shuffle(config.buffer_size).batch(config.batch_size)
     
     generator = model.make_generator_model()
     discriminator = model.make_discriminator_model()
 
-    generator_optimizer = tf.train.AdamOptimizer(1e-4)
-    discriminator_optimizer = tf.train.AdamOptimizer(1e-4)
+    generator_optimizer = tf.train.AdamOptimizer(config.learning_rate)
+    discriminator_optimizer = tf.train.AdamOptimizer(config.learning_rate)
 
-    checkpoint_dir = './training_checkpoints'
-    checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
+    checkpoint_prefix = os.path.join(config.model_path, "ckpt")
     checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
                                      discriminator_optimizer=discriminator_optimizer,
                                      generator=generator,
@@ -137,7 +135,7 @@ if __name__ == '__main__':
     # Compile training function into a callable TensorFlow graph
     # Speeds up execution
     train_step = tf.contrib.eager.defun(train_step)
-    train(train_dataset, EPOCHS)
+    train(train_dataset, config.max_epoch)
     print("\nTraining done\n")
 
-    checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
+    # checkpoint.restore(tf.train.latest_checkpoint(config.model_path))

@@ -25,14 +25,17 @@ class ConfigCGAN:
     dropout_rate = 0.5
 
     # Hyperparameters
-    learning_rate = 0.0002
+    learning_rate = 2e-4
     beta1 = 0.5
     max_epoch = 20
     L1_lambda = 100
 
+    # Data
+    buffer_size = 60000
+    batch_size = 256
+
     # Data storage
     save_per_epoch=5
-    data_path = "out/noise_gan"
-    model_path_train = ""
-    model_path_test = "model/noise_gan/checkpoint/model{}.ckpt".format(max_epoch) 
-    output_path = "out/noise_gan"
+    data_path = "out/noise_gan/data"
+    model_path = "out/noise_gan/model"
+    results_path = "out/noise_gan/results"
