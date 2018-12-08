@@ -121,11 +121,10 @@ if __name__ == '__main__':
                                         config.channels)
     # Add noise for condition input
     train_images = data_processing.normalise(train_images, (-1, 1), (0, 255))
-    train_inputs = artefacts.add_gaussian_noise(train_images, stdev=0.2)
-    train_labels = train_images
+    train_inputs = artefacts.add_gaussian_noise(train_images, stdev=0.2).astype('float32')
+    train_labels = train_images.astype('float32')
 
-    train_dataset = tf.data.Dataset.from_tensor_slices((train_inputs.astype('float32'),
-                                                        train_labels.astype('float32')))\
+    train_dataset = tf.data.Dataset.from_tensor_slices((train_inputs, train_labels))\
         .shuffle(config.buffer_size).batch(config.batch_size)
     
     generator = model.make_generator_model()
