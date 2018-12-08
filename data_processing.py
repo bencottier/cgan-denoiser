@@ -12,11 +12,21 @@ import numpy as np
 import nibabel as nib
 
 
-def normalise(a, r=(-1, 1)):
+def normalise(data, new_range=(-1, 1), current_range=None, axis=None):
     """
-    Normalise the values of the numpy.ndarray, a, to the range r.
+    Normalise the values of a numpy.ndarray to a specified range.
     """
-    return (r[1] - r[0])*(a - a.min())/(a.max() - a.min()) - r[0]
+    s = new_range[1] - new_range[0]
+    if current_range is not None:
+        mins = current_range[0]
+        maxs = current_range[1]
+    elif axis is not None:
+        mins = np.nanmin(data, axis=axis, keepdims=True)
+        maxs = np.nanmax(data, axis=axis, keepdims=True)   
+    else:
+        mins = data.min()
+        maxs = data.max() 
+    return s * (data - mins) / (maxs - mins) + new_range[0]
 
 
 def next_power_2(n):
