@@ -11,8 +11,13 @@ from data_processing import normalise
 import numpy as np
 
 
-def add_gaussian_noise(data, stdev=0.1, mean=0.0):
-    return normalise(data, (0, 1)) + np.random.normal(mean, stdev, data.shape)
+def add_gaussian_noise(data, stdev=0.1, mean=0.0, clamping=True):
+    noisy = data + np.random.normal(mean, stdev, data.shape)
+    return clamp(noisy) if clamping else noisy
+
+
+def clamp(x, rng=(-1, 1)):
+    return np.maximum(rng[0], np.minimum(x, rng[1]))
 
 
 if __name__ == "__main__":
@@ -26,7 +31,7 @@ if __name__ == "__main__":
     # data = ascent()
     data = train_images
     print("Data shape: ", data.shape)
-    data = add_gaussian_noise(data, 0.2)
+    data = add_gaussian_noise(normalise(data, (-1, 1), (0, 255)), 0.2)
     # plt.imshow(data[0], cmap='gray')
 
     fig = plt.figure(figsize=(4,4))
