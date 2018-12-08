@@ -38,14 +38,11 @@ def discriminator_loss(real_output, generated_output):
     return total_loss
 
 
-def train_step(images):
-    # generating noise from a normal distribution
-    noise = tf.random_normal([BATCH_SIZE, noise_dim])
-
+def train_step(inputs, labels):
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-        generated_images = generator(noise, training=True)
+        generated_images = generator(inputs, training=True)
 
-        real_output = discriminator(images, training=True)
+        real_output = discriminator(labels, training=True)
         generated_output = discriminator(generated_images, training=True)
             
         gen_loss = generator_loss(generated_output)
@@ -61,13 +58,13 @@ def train_step(images):
 def train(dataset, epochs):
     for epoch in range(epochs):
         start = time.time()
-        
-        for images in dataset:
-            train_step(images)
+
+        for x, y in dataset.make_one_shot_iterator():
+            train_step(x, y)
 
         generate_and_save_images(generator,
                                  epoch + 1,
-                                 random_vector_for_generation)
+                                 selected_examples)
         
         # saving (checkpoint) the model every 15 epochs
         if (epoch + 1) % 15 == 0:
@@ -78,7 +75,7 @@ def train(dataset, epochs):
     # generating after the final epoch
     generate_and_save_images(generator,
                              epochs,
-                             random_vector_for_generation)
+                             selected_examples)
 
 
 def generate_and_save_images(model, epoch, test_input):
@@ -98,20 +95,24 @@ def generate_and_save_images(model, epoch, test_input):
 
 
 if __name__ == '__main__':
+    BUFFER_SIZE = 60000
+    BATCH_SIZE = 256
+    EPOCHS = 50
+
     # Load the dataset
-    (train_images, train_labels), (_, _) = tf.keras.datasets.mnist.load_data()
+    (train_images, _), (_, _) = tf.keras.datasets.mnist.load_data()
     train_images = train_images.reshape(train_images.shape[0], 
                                         config.raw_size,
                                         config.raw_size,
-                                        config.channels).astype('float32')
+                                        config.channels)
     # Add noise for condition input
-    train_inputs = data_processing.normalise(artefacts.add_gaussian_noise(train_images), (-1, 1))
-    train_labels = data_processing.normalise(train_images, (-1, 1))
+    train_images = data_processing.normalise(train_images, (-1, 1), (0, 255))
+    train_inputs = artefacts.add_gaussian_noise(train_images, stdev=0.2)
+    train_labels = train_images
 
-    BUFFER_SIZE = 60000
-    BATCH_SIZE = 256
-
-    train_dataset = tf.data.Dataset.from_tensor_slices(train_inputs).shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
+    train_dataset = tf.data.Dataset.from_tensor_slices((train_inputs.astype('float32'),
+                                                        train_labels.astype('float32')))\
+        .shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
     
     generator = model.make_generator_model()
     discriminator = model.make_discriminator_model()
@@ -126,14 +127,11 @@ if __name__ == '__main__':
                                      generator=generator,
                                      discriminator=discriminator)
     
-    EPOCHS = 50
-    noise_dim = 100
     num_examples_to_generate = 16
-
-    # We'll re-use this random vector used to seed the generator so
-    # it will be easier to see the improvement over time.
-    random_vector_for_generation = tf.random_normal([num_examples_to_generate,
-                                                     noise_dim])
+    random_indices = np.random.choice(np.arange(train_inputs.shape[0]),
+                                      num_examples_to_generate,
+                                      replace=False)
+    selected_examples = train_inputs[random_indices]
 
     print("\nTraining...\n")
     # Compile training function into a callable TensorFlow graph
