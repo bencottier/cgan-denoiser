@@ -6,6 +6,7 @@ Parameters for different models
 
 author: Benjamin Cottier
 """
+from os.path import join
 
 class ConfigCGAN:
     """
@@ -36,6 +37,7 @@ class ConfigCGAN:
 
     # Data storage
     save_per_epoch=5
-    data_path = "out/noise_gan/data"
-    model_path = "out/noise_gan/model"
-    results_path = "out/noise_gan/results"
+    exp_name = 'noise_gan'
+    data_path = join('out', exp_name, 'data')
+    model_path = join('out', exp_name, 'model')
+    results_path = join('out', exp_name, 'results')
