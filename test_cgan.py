@@ -11,6 +11,7 @@ import artefacts
 import data_processing
 from config import ConfigCGAN as config
 import cgan as model
+import utils
 import tensorflow as tf
 tf.enable_eager_execution()
 import glob
@@ -50,11 +51,15 @@ def train_step(inputs, labels):
             
         gen_loss = generator_loss(generated_output)
         disc_loss = discriminator_loss(real_output, generated_output)
+        gen_rmse = data_processing.rmse(inputs, labels)
+        gen_psnr = data_processing.psnr(inputs, labels)
 
         # Logging
         global_step.assign_add(1)
-        log_loss(gen_loss, "generator")
-        log_loss(disc_loss, "discriminator")
+        log_metric(gen_loss, "loss_generator")
+        log_metric(disc_loss, "loss_discriminator")
+        log_metric(gen_rmse, "rmse")
+        log_metric(gen_psnr, "psnr")
 
     gradients_of_generator = gen_tape.gradient(gen_loss, generator.variables)
     gradients_of_discriminator = disc_tape.gradient(disc_loss, discriminator.variables)
@@ -75,7 +80,7 @@ def train(dataset, epochs):
                                  selected_inputs,
                                  selected_labels)
         
-        # saving (checkpoint) the model every 15 epochs
+        # saving (checkpoint) the model every few epochs
         if (epoch + 1) % config.save_per_epoch == 0:
             checkpoint.save(file_prefix=checkpoint_prefix)
         
@@ -89,9 +94,12 @@ def train(dataset, epochs):
 
 
 def generate_and_save_images(model, epoch, test_inputs, test_labels):
-    # Make sure the training parameter is set to False because we
-    # don't want to train the batchnorm layer when doing inference.
-    predictions = model(test_inputs, training=False)
+    if model is None:
+        predictions = test_inputs
+    else:
+        # Make sure the training parameter is set to False because we
+        # don't want to train the batchnorm layer when doing inference.
+        predictions = model(test_inputs, training=False)
 
     types = [predictions, test_labels]  # Image types (alternated in rows)
     ntype = len(types)
@@ -109,7 +117,7 @@ def generate_and_save_images(model, epoch, test_inputs, test_labels):
         idx = i - shift
         # Plot
         for t in range(ntype):
-            if row_rel == ntype -  1:
+            if row_rel == 0:
                 j = int(i / ntype)
                 rmse = data_processing.rmse(test_labels[j], predictions[j], norm=2)
                 psnr = data_processing.psnr(test_labels[j], predictions[j], max_diff=1)
@@ -120,20 +128,28 @@ def generate_and_save_images(model, epoch, test_inputs, test_labels):
         plt.xticks([])
         plt.yticks([])
     
-    plt.savefig(os.path.join(config.data_path, 
-                             'image_at_epoch_{:04d}.png'.format(epoch)))
+    plt.savefig(os.path.join(data_path, 'image_at_epoch_{:04d}.png'.format(epoch)))
     # plt.show()
 
 
-def log_loss(loss, name):
+def log_metric(name, value):
     with tf.contrib.summary.always_record_summaries():
-        tf.contrib.summary.scalar("loss_" + name, loss)
+        tf.contrib.summary.scalar(name, value)
 
 
 if __name__ == '__main__':
+    # Make directories for this run
+    time_string = time.strftime("%Y-%m-%d-%H-%M-%S")
+    data_path = os.path.join(config.data_path, time_string)
+    model_path = os.path.join(config.model_path, time_string)
+    results_path = os.path.join(config.results_path, time_string)
+    utils.safe_makedirs(data_path)
+    utils.safe_makedirs(model_path)
+    utils.safe_makedirs(results_path)
+
     # Initialise logging
-    log_dir = os.path.join('logs', config.exp_name, time.strftime("%Y-%m-%d-%H-%M-%S"))
-    summary_writer = tf.contrib.summary.create_file_writer(log_dir, flush_millis=10000)
+    log_path = os.path.join('logs', config.exp_name, time_string)
+    summary_writer = tf.contrib.summary.create_file_writer(log_path, flush_millis=10000)
     summary_writer.set_as_default()
     global_step = tf.train.get_or_create_global_step()
 
@@ -158,7 +174,7 @@ if __name__ == '__main__':
     generator_optimizer = tf.train.AdamOptimizer(config.learning_rate)
     discriminator_optimizer = tf.train.AdamOptimizer(config.learning_rate)
 
-    checkpoint_prefix = os.path.join(config.model_path, "ckpt")
+    checkpoint_prefix = os.path.join(model_path, "ckpt")
     checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
                                      discriminator_optimizer=discriminator_optimizer,
                                      generator=generator,
@@ -171,12 +187,13 @@ if __name__ == '__main__':
                                       replace=False)
     selected_inputs = train_inputs[random_indices]
     selected_labels = train_labels[random_indices]
+    generate_and_save_images(None, 0, selected_inputs, selected_labels)  # baseline
 
     print("\nTraining...\n")
     # Compile training function into a callable TensorFlow graph (speeds up execution)
-    train_step = tf.contrib.eager.defun(train_step)
+    # train_step = tf.contrib.eager.defun(train_step)
     train(train_dataset, config.max_epoch)
     print("\nTraining done\n")
 
-    # checkpoint.restore(tf.train.latest_checkpoint(config.model_path))
+    # checkpoint.restore(tf.train.latest_checkpoint(model_path))
     # generate_and_save_images(generator, 0, selected_inputs, selected_labels)
