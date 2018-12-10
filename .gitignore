@@ -4,3 +4,4 @@
 .vscode/
 logs/
 out/
+!example/*.png

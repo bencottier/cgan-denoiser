@@ -35,6 +35,14 @@ The current demo trains the CGAN to denoise MNIST digits:
 
 A plot with a small sample of training results will be saved to `out/noise_gan/data/{time_stamp}` for each epoch. The `time_stamp` is generated at execution time, and the rest of the path is set in `config.py`.
 
+Example starting condition:
+
+![Example starting condition](example/image_at_epoch_0000.png)
+
+Example training result:
+
+![Example training result](example/image_at_epoch_0012.png)
+
 ## References
 [1] Ronneberger, Olaf, Philipp Fischer, and Thomas Brox. "U-net: Convolutional networks for biomedical image segmentation." In International Conference on Medical image computing and computer-assisted intervention, pp. 234-241. Springer, Cham, 2015.
 
