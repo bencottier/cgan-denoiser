@@ -7,7 +7,6 @@ Data processing for convolutional neural networks.
 author: Ben Cottier (git: bencottier)
 """
 from __future__ import absolute_import, division, print_function
-import filenames
 import numpy as np
 import nibabel as nib
 import math
