@@ -132,7 +132,7 @@ def generate_and_save_images(model, epoch, test_inputs, test_labels):
     # plt.show()
 
 
-def log_metric(name, value):
+def log_metric(value, name):
     with tf.contrib.summary.always_record_summaries():
         tf.contrib.summary.scalar(name, value)
 
