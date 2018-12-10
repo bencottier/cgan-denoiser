@@ -4,9 +4,9 @@ data_processing.py
 
 Data processing for convolutional neural networks.
 
-@author: Benjamin Cottier
+author: Ben Cottier (git: bencottier)
 """
-from __future__ import print_function, division
+from __future__ import absolute_import, division, print_function
 import filenames
 import numpy as np
 import nibabel as nib
@@ -15,7 +15,18 @@ import math
 
 def normalise(data, new_range=(-1, 1), current_range=None, axis=None):
     """
-    Normalise the values of a numpy.ndarray to a specified range.
+    Normalise the values of an ndarray to a specified range.
+
+    Arguments:
+        data: ndarray. Data to normalise.
+        new_range: tuple of int. Value range to normalise to.
+        current_range: tuple of int. Value range to normalise from. 
+            If not specified, assumes the minimum and maximum values 
+            that occur in the data.
+        axis: int or tuple of int. Specifies the axes to normalise over if 
+            current_range is not specified. For example, if the data is 
+            a batch of images, one might want to normalise each image by its 
+            respective maximum and minimum value.
     """
     s = new_range[1] - new_range[0]
     if current_range is not None:
@@ -31,20 +42,32 @@ def normalise(data, new_range=(-1, 1), current_range=None, axis=None):
 
 
 def next_power_2(n):
+    """
+    Compute the nearest power of 2 greater than n.
+
+    Arguments:
+        n: integer.
+    """
     count = 0
-  
-    # First n in the below condition is for the case where n is 0 
-    if (n and not(n & (n - 1))): 
+    # If it is a non-zero power of 2, return it
+    if n and not (n & (n - 1)): 
         return n 
-      
-    while( n != 0): 
+    # Keep dividing n by 2 until it is 0
+    while n != 0: 
         n >>= 1
         count += 1
-      
-    return 1<<count
+    # Result is 2 to the power of divisions taken
+    return 1 << count
 
 
 def padding_power_2(shape):
+    """
+    Get the padding required to change the given shape to a square power 
+    of 2 in each dimension.
+
+    Arguments:
+        shape: tuple of 2 ints. The original shape.
+    """
     padded_size = next_power_2(max(shape))
     return ((padded_size - shape[0])//2, (padded_size - shape[1])//2)
 
@@ -55,7 +78,6 @@ def preprocess(data, pad_size):
     """
     # Reverse the flipping about the x-axis caused by data reading
     data = np.flipud(data)
-
     # Ensure it is padded to square
     data_rows, data_cols = data.shape
     # print("Original shape", (data_rows, data_cols))

@@ -4,14 +4,25 @@ artefacts.py
 
 Functions to artificially induce artefacts in images. 
 
-@author: Benjamin Cottier
+author: Ben Cottier (git: bencottier)
 """
-from __future__ import print_function, division
+from __future__ import absolute_import, division, print_function
 from data_processing import normalise
 import numpy as np
 
 
 def add_gaussian_noise(data, stdev=0.1, mean=0.0, clamping=True):
+    """
+    Add noise to array data, sampled from a normal/Gaussian distribution.
+
+    Assumes the data is limited to the range [-1.0, 1.0].
+
+    Arguments:
+        data: ndarray. Data to add noise to.
+        stdev: float > 0. Standard deviation of the noise distribution.
+        mean: float. Mean (average) of the noise distribution.
+        clamping: bool. If True, limit the resulting data to [-1.0, 1.0]
+    """
     noisy = data + np.random.normal(mean, stdev, data.shape)
     return clamp(noisy) if clamping else noisy
 

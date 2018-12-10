@@ -4,7 +4,7 @@ test_cgan.py
 
 Testing a Conditional GAN model.
 
-author: Benjamin Cottier
+author: Ben Cottier (git: bencottier)
 """
 from __future__ import absolute_import, division, print_function
 import artefacts

@@ -4,7 +4,7 @@ config.py
 
 Parameters for different models
 
-author: Benjamin Cottier
+author: Ben Cottier (git: bencottier)
 """
 from os.path import join
 
