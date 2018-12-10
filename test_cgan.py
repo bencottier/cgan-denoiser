@@ -20,6 +20,7 @@ import numpy as np
 import os
 import PIL
 import time
+import math
 
 
 def generator_loss(generated_output):
@@ -71,7 +72,8 @@ def train(dataset, epochs):
 
         generate_and_save_images(generator,
                                  epoch + 1,
-                                 selected_examples)
+                                 selected_inputs,
+                                 selected_labels)
         
         # saving (checkpoint) the model every 15 epochs
         if (epoch + 1) % config.save_per_epoch == 0:
@@ -82,20 +84,41 @@ def train(dataset, epochs):
     # generating after the final epoch
     generate_and_save_images(generator,
                              epochs,
-                             selected_examples)
+                             selected_inputs,
+                             selected_labels)
 
 
-def generate_and_save_images(model, epoch, test_input):
-    # make sure the training parameter is set to False because we
+def generate_and_save_images(model, epoch, test_inputs, test_labels):
+    # Make sure the training parameter is set to False because we
     # don't want to train the batchnorm layer when doing inference.
-    predictions = model(test_input, training=False)
+    predictions = model(test_inputs, training=False)
 
-    fig = plt.figure(figsize=(4,4))
+    types = [predictions, test_labels]  # Image types (alternated in rows)
+    ntype = len(types)
+    nrows = 4
+    ncols = 8
+    fig = plt.figure(figsize=(8, 5))
     
-    for i in range(predictions.shape[0]):
-        plt.subplot(4, 4, i+1)
-        plt.imshow(predictions[i, :, :, 0] * 127.5 + 127.5, cmap='gray')
-        plt.axis('off')
+    for i in range(ntype * predictions.shape[0]):
+        plt.subplot(nrows, ncols, i+1)
+        # Get relative index
+        row = int(i / ncols)
+        row_rel = row % ntype
+        group = int(row / ntype)
+        shift = ncols * (group * (ntype - 1) + row_rel)
+        idx = i - shift
+        # Plot
+        for t in range(ntype):
+            if row_rel == ntype -  1:
+                j = int(i / ntype)
+                rmse = data_processing.rmse(test_labels[j], predictions[j], norm=2)
+                psnr = data_processing.psnr(test_labels[j], predictions[j], max_diff=1)
+                plt.xlabel('RMSE={:.3f}\nPSNR={:.2f}'.format(rmse, psnr), fontsize=8)
+            if row_rel == t:
+                plt.imshow(types[row_rel][idx, :, :, 0] * 127.5 + 127.5, cmap='gray')
+                break
+        plt.xticks([])
+        plt.yticks([])
     
     plt.savefig(os.path.join(config.data_path, 
                              'image_at_epoch_{:04d}.png'.format(epoch)))
@@ -128,6 +151,7 @@ if __name__ == '__main__':
     train_dataset = tf.data.Dataset.from_tensor_slices((train_inputs, train_labels))\
         .shuffle(config.buffer_size).batch(config.batch_size)
     
+    # Set up the models for training
     generator = model.make_generator_model()
     discriminator = model.make_discriminator_model()
 
@@ -140,17 +164,19 @@ if __name__ == '__main__':
                                      generator=generator,
                                      discriminator=discriminator)
     
+    # Set up some random (but consistent) cases to monitor over training
     num_examples_to_generate = 16
     random_indices = np.random.choice(np.arange(train_inputs.shape[0]),
                                       num_examples_to_generate,
                                       replace=False)
-    selected_examples = train_inputs[random_indices]
+    selected_inputs = train_inputs[random_indices]
+    selected_labels = train_labels[random_indices]
 
     print("\nTraining...\n")
-    # Compile training function into a callable TensorFlow graph
-    # Speeds up execution
+    # Compile training function into a callable TensorFlow graph (speeds up execution)
     train_step = tf.contrib.eager.defun(train_step)
     train(train_dataset, config.max_epoch)
     print("\nTraining done\n")
 
     # checkpoint.restore(tf.train.latest_checkpoint(config.model_path))
+    # generate_and_save_images(generator, 0, selected_inputs, selected_labels)
