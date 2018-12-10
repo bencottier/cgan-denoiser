@@ -2,7 +2,7 @@
 """
 data_processing.py
 
-MRI data preprocessing for convolutional neural networks.
+Data processing for convolutional neural networks.
 
 @author: Benjamin Cottier
 """
@@ -10,6 +10,7 @@ from __future__ import print_function, division
 import filenames
 import numpy as np
 import nibabel as nib
+import math
 
 
 def normalise(data, new_range=(-1, 1), current_range=None, axis=None):
@@ -145,3 +146,17 @@ def get_dataset(input_path, label_path, test_cases, max_training_cases, size):
     print("Used", i, "images for training")
 
     return (inputs, labels), (test_inputs, test_labels), case_list
+
+
+def mse(x1, x2, norm=2):
+    return np.mean(((x1 - x2)/norm)**2)
+
+
+def rmse(x1, x2, norm=2):
+    return math.sqrt(mse(x1, x2, norm))
+
+
+def psnr(x1, x2, max_diff=1):
+    error = rmse(x1, x2)
+    psnr_out = 20 * math.log(max_diff / error, 10)
+    return psnr_out
