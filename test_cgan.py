@@ -109,7 +109,8 @@ def log_loss(loss, name):
 
 if __name__ == '__main__':
     # Initialise logging
-    summary_writer = tf.contrib.summary.create_file_writer('logs', flush_millis=10000)
+    log_dir = os.path.join('logs', config.exp_name, time.strftime("%Y-%m-%d-%H-%M-%S"))
+    summary_writer = tf.contrib.summary.create_file_writer(log_dir, flush_millis=10000)
     summary_writer.set_as_default()
     global_step = tf.train.get_or_create_global_step()
 
