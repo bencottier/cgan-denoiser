@@ -14,20 +14,24 @@ Written to be compatible with Python 2.7 or 3.4 and above, but only tested on 2.
 You will need [TensorFlow](https://www.tensorflow.org/install/), set up appropriately for your machine.
 
 You can see the required Python packages listed in `environment.yml`. If you use Anaconda, you can use this file to install the authors' environment (note `tensorflow-gpu` is used, which requires a GPU):
-> `conda env create -f environment.yml`
+
+    conda env create -f environment.yml
 
 ## Choose the data
 The default demo, `test_cgan.py`, uses the MNIST digits dataset and applies Gaussian random noise to it as the condition for the generator model. Currently only Gaussian random noise has been implemented for noise/artefact generation. You can try your own data and implement your own noise/artefact generators.
 
 The data is assigned at this line in `test_cgan.py`:
-> `(train_images, _), (_, _) = tf.keras.datasets.mnist.load_data()`
+
+    (train_images, _), (_, _) = tf.keras.datasets.mnist.load_data()
 
 The noise/artefacts are introduced with this line:
-> `train_inputs = artefacts.add_gaussian_noise(train_images, stdev=0.2).astype('float32')`
+
+    train_inputs = artefacts.add_gaussian_noise(train_images, stdev=0.2).astype('float32')
 
 ## Run
 The current demo trains the CGAN to denoise MNIST digits:
-> `python test_cgan.py`
+
+    python test_cgan.py
 
 A plot with a small sample of training results will be saved to `out/noise_gan/data/{time_stamp}` for each epoch. The `time_stamp` is generated at execution time, and the rest of the path is set in `config.py`.
 
