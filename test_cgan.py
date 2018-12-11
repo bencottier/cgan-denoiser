@@ -25,8 +25,11 @@ import math
 
 
 def generator_loss(labels, generated_images, generated_output):
-    return tf.losses.sigmoid_cross_entropy(tf.ones_like(generated_output), generated_output) \
-        + config.L1_lambda * tf.losses.absolute_difference(labels, generated_images)
+    # [1,1,...,1] with generated images since we want the discriminator to judge them as real
+    d_loss = tf.losses.sigmoid_cross_entropy(tf.ones_like(generated_output), generated_output)
+    # As well as "fooling" the discriminator, we want particular pressure on ground-truth accuracy
+    l1_loss = config.L1_lambda * tf.losses.absolute_difference(labels, generated_images)  # mean
+    return d_loss + l1_loss
 
 
 def discriminator_loss(real_output, generated_output):
