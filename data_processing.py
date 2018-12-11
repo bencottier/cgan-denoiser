@@ -8,7 +8,7 @@ author: Ben Cottier (git: bencottier)
 """
 from __future__ import absolute_import, division, print_function
 import numpy as np
-import nibabel as nib
+import tensorflow as tf
 import math
 
 
@@ -72,14 +72,12 @@ def padding_power_2(shape):
 
 
 def mse(x1, x2, norm=2):
-    return np.mean(((x1 - x2)/norm)**2)
+    return tf.reduce_mean(tf.square((x1 - x2) / norm))
 
 
 def rmse(x1, x2, norm=2):
-    return math.sqrt(mse(x1, x2, norm))
+    return tf.sqrt(mse(x1, x2, norm))
 
 
 def psnr(x1, x2, max_diff=1):
-    error = rmse(x1, x2)
-    psnr_out = 20 * math.log(max_diff / error, 10)
-    return psnr_out
+    return 20. * tf.log(max_diff / rmse(x1, x2)) / tf.log(10.)
