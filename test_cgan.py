@@ -24,8 +24,9 @@ import time
 import math
 
 
-def generator_loss(generated_output):
-    return tf.losses.sigmoid_cross_entropy(tf.ones_like(generated_output), generated_output)
+def generator_loss(labels, generated_images, generated_output):
+    return tf.losses.sigmoid_cross_entropy(tf.ones_like(generated_output), generated_output) \
+        + config.L1_lambda * tf.losses.absolute_difference(labels, generated_images)
 
 
 def discriminator_loss(real_output, generated_output):
@@ -49,7 +50,7 @@ def train_step(inputs, labels):
         real_output = discriminator(labels, training=True)
         generated_output = discriminator(generated_images, training=True)
             
-        gen_loss = generator_loss(generated_output)
+        gen_loss = generator_loss(labels, generated_images, generated_output)
         disc_loss = discriminator_loss(real_output, generated_output)
         gen_rmse = data_processing.rmse(inputs, labels)
         gen_psnr = data_processing.psnr(inputs, labels)
