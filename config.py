@@ -28,7 +28,7 @@ class ConfigCGAN:
     # Hyperparameters
     learning_rate = 2e-4
     beta1 = 0.5
-    max_epoch = 50
+    max_epoch = 20
     L1_lambda = 100
 
     # Data

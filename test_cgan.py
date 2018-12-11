@@ -192,7 +192,7 @@ if __name__ == '__main__':
 
     print("\nTraining...\n")
     # Compile training function into a callable TensorFlow graph (speeds up execution)
-    # train_step = tf.contrib.eager.defun(train_step)
+    train_step = tf.contrib.eager.defun(train_step)
     train(train_dataset, config.max_epoch)
     print("\nTraining done\n")
 
