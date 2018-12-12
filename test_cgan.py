@@ -24,12 +24,14 @@ import time
 import math
 
 
-def generator_loss(labels, generated_images, generated_output):
+def generator_d_loss(generated_output):
     # [1,1,...,1] with generated images since we want the discriminator to judge them as real
-    d_loss = tf.losses.sigmoid_cross_entropy(tf.ones_like(generated_output), generated_output)
+    return tf.losses.sigmoid_cross_entropy(tf.ones_like(generated_output), generated_output)
+
+
+def generator_abs_loss(labels, generated_images):
     # As well as "fooling" the discriminator, we want particular pressure on ground-truth accuracy
-    l1_loss = config.L1_lambda * tf.losses.absolute_difference(labels, generated_images)  # mean
-    return d_loss + l1_loss
+    return config.L1_lambda * tf.losses.absolute_difference(labels, generated_images)  # mean
 
 
 def discriminator_loss(real_output, generated_output):
@@ -53,13 +55,17 @@ def train_step(inputs, labels):
         real_output = discriminator(labels, training=True)
         generated_output = discriminator(generated_images, training=True)
             
-        gen_loss = generator_loss(labels, generated_images, generated_output)
+        gen_d_loss = generator_d_loss(generated_output)
+        gen_abs_loss = generator_abs_loss(labels, generated_images)
+        gen_loss = gen_d_loss + gen_abs_loss
+        gen_rmse = data_processing.rmse(labels, generated_images)
+        gen_psnr = data_processing.psnr(labels, generated_images)
         disc_loss = discriminator_loss(real_output, generated_output)
-        gen_rmse = data_processing.rmse(inputs, labels)
-        gen_psnr = data_processing.psnr(inputs, labels)
 
         # Logging
         global_step.assign_add(1)
+        log_metric(gen_d_loss, "loss_generator_deception")
+        log_metric(gen_abs_loss, "loss_generator_abs_error")
         log_metric(gen_loss, "loss_generator")
         log_metric(disc_loss, "loss_discriminator")
         log_metric(gen_rmse, "rmse")
