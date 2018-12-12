@@ -41,7 +41,7 @@ Example starting condition:
 
 Example training result:
 
-![Example training result](example/image_at_epoch_0012.png)
+![Example training result](example/image_at_epoch_0019.png)
 
 ## References
 [1] Ronneberger, Olaf, Philipp Fischer, and Thomas Brox. "U-net: Convolutional networks for biomedical image segmentation." In International Conference on Medical image computing and computer-assisted intervention, pp. 234-241. Springer, Cham, 2015.
