@@ -133,7 +133,7 @@ def generate_and_save_images(model, epoch, test_inputs, test_labels):
                 psnr = data_processing.psnr(test_labels[j], predictions[j], max_diff=1)
                 plt.xlabel('RMSE={:.3f}\nPSNR={:.2f}'.format(rmse, psnr), fontsize=8)
             if row_rel == t:
-                plt.imshow(types[row_rel][idx, :, :, 0] * 127.5 + 127.5, cmap='gray')
+                plt.imshow(types[row_rel][idx, :, :, 0], vmin=-1, vmax=1, cmap='gray')
                 break
         plt.xticks([])
         plt.yticks([])
@@ -148,6 +148,8 @@ def log_metric(value, name):
 
 
 if __name__ == '__main__':
+    # model_path = "out/noise_gan/model/2018-12-12-11-07-49"
+
     # Make directories for this run
     time_string = time.strftime("%Y-%m-%d-%H-%M-%S")
     data_path = os.path.join(config.data_path, time_string)
@@ -164,7 +166,7 @@ if __name__ == '__main__':
     global_step = tf.train.get_or_create_global_step()
 
     # Load the dataset
-    (train_images, _), (_, _) = tf.keras.datasets.mnist.load_data()
+    (train_images, _), (test_images, _) = tf.keras.datasets.mnist.load_data()
     train_images = train_images.reshape(train_images.shape[0], 
                                         config.raw_size,
                                         config.raw_size,
@@ -176,6 +178,22 @@ if __name__ == '__main__':
 
     train_dataset = tf.data.Dataset.from_tensor_slices((train_inputs, train_labels))\
         .shuffle(config.buffer_size).batch(config.batch_size)
+
+    # Test set
+    test_images = test_images.reshape(test_images.shape[0], 
+                                    config.raw_size,
+                                    config.raw_size,
+                                    config.channels)
+    test_images = data_processing.normalise(test_images, (-1, 1), (0, 255))
+    test_inputs = artefacts.add_gaussian_noise(test_images, stdev=0.2).astype('float32')
+    test_labels = test_images.astype('float32')
+    # Set up some random (but consistent) test cases to monitor
+    num_examples_to_generate = 16
+    random_indices = np.random.choice(np.arange(test_inputs.shape[0]),
+                                      num_examples_to_generate,
+                                      replace=False)
+    selected_inputs = test_inputs[random_indices]
+    selected_labels = test_labels[random_indices]
     
     # Set up the models for training
     generator = model.make_generator_model()
@@ -189,16 +207,8 @@ if __name__ == '__main__':
                                      discriminator_optimizer=discriminator_optimizer,
                                      generator=generator,
                                      discriminator=discriminator)
-    
-    # Set up some random (but consistent) cases to monitor over training
-    num_examples_to_generate = 16
-    random_indices = np.random.choice(np.arange(train_inputs.shape[0]),
-                                      num_examples_to_generate,
-                                      replace=False)
-    selected_inputs = train_inputs[random_indices]
-    selected_labels = train_labels[random_indices]
-    generate_and_save_images(None, 0, selected_inputs, selected_labels)  # baseline
 
+    generate_and_save_images(None, 0, selected_inputs, selected_labels)  # baseline
     print("\nTraining...\n")
     # Compile training function into a callable TensorFlow graph (speeds up execution)
     train_step = tf.contrib.eager.defun(train_step)
@@ -206,4 +216,18 @@ if __name__ == '__main__':
     print("\nTraining done\n")
 
     # checkpoint.restore(tf.train.latest_checkpoint(model_path))
+    # prediction = generator(selected_inputs, training=False)
+
+    # for i in range(num_examples_to_generate):
+    #     fig = plt.figure()
+    #     plt.subplot(1, 4, 1)
+    #     plt.imshow(selected_inputs[i, :, :, 0], vmin=-1, vmax=1)
+    #     plt.subplot(1, 4, 2)
+    #     plt.imshow(prediction[i, :, :, 0], vmin=-1, vmax=1)
+    #     plt.subplot(1, 4, 3)
+    #     plt.imshow(selected_labels[i, :, :, 0], vmin=-1, vmax=1)
+    #     plt.subplot(1, 4, 4)
+    #     plt.imshow(abs(selected_labels[i, :, :, 0] - prediction[i, :, :, 0]), vmin=0, vmax=2)
+    #     plt.show()
+
     # generate_and_save_images(generator, 0, selected_inputs, selected_labels)
