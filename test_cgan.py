@@ -64,12 +64,12 @@ def train_step(inputs, labels):
 
         # Logging
         global_step.assign_add(1)
-        log_metric(gen_d_loss, "loss_generator_deception")
-        log_metric(gen_abs_loss, "loss_generator_abs_error")
-        log_metric(gen_loss, "loss_generator")
-        log_metric(disc_loss, "loss_discriminator")
-        log_metric(gen_rmse, "rmse")
-        log_metric(gen_psnr, "psnr")
+        log_metric(gen_d_loss, "train/loss/generator_deception")
+        log_metric(gen_abs_loss, "train/loss/generator_abs_error")
+        log_metric(gen_loss, "train/loss/generator")
+        log_metric(disc_loss, "train/loss/discriminator")
+        log_metric(gen_rmse, "train/accuracy/rmse")
+        log_metric(gen_psnr, "train/accuracy/psnr")
 
     gradients_of_generator = gen_tape.gradient(gen_loss, generator.variables)
     gradients_of_discriminator = disc_tape.gradient(disc_loss, discriminator.variables)
