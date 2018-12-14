@@ -14,7 +14,7 @@ from scipy.stats import norm
 import math
 
 
-def add_gaussian_noise(data, stdev=0.1, mean=0.0, clip=True):
+def add_gaussian_noise(data, stdev=0.1, mean=0.0, data_range=(0, 1), clip=True):
     """
     Add noise to array data, sampled from a normal/Gaussian distribution.
 
@@ -26,8 +26,10 @@ def add_gaussian_noise(data, stdev=0.1, mean=0.0, clip=True):
         mean: float. Mean (average) of the noise distribution.
         clip: bool. If True, limit the resulting data to [-1.0, 1.0]
     """
-    noisy = data + np.random.normal(mean, stdev, data.shape)
-    return np.clip(noisy, -1, 1) if clip else noisy
+    data_ = normalise(data, (-1, 1), data_range)
+    noisy = data_ + np.random.normal(mean, stdev, data.shape)
+    noisy = np.clip(noisy, -1, 1) if clip else noisy
+    return normalise(noisy, data_range, (-1, 1))
 
 
 def add_space_noise(data, fwhm=1.4, sig=1.2):
