@@ -11,7 +11,7 @@ from data_processing import normalise
 import numpy as np
 
 
-def add_gaussian_noise(data, stdev=0.1, mean=0.0, clamping=True):
+def add_gaussian_noise(data, stdev=0.1, mean=0.0, data_range=(0, 1), clip=True):
     """
     Add noise to array data, sampled from a normal/Gaussian distribution.
 
@@ -23,8 +23,10 @@ def add_gaussian_noise(data, stdev=0.1, mean=0.0, clamping=True):
         mean: float. Mean (average) of the noise distribution.
         clamping: bool. If True, limit the resulting data to [-1.0, 1.0]
     """
-    noisy = data + np.random.normal(mean, stdev, data.shape)
-    return clamp(noisy) if clamping else noisy
+    data_ = normalise(data, (-1, 1), data_range)
+    noisy = data_ + np.random.normal(mean, stdev, data.shape)
+    noisy = np.clip(noisy, -1, 1) if clip else noisy
+    return normalise(noisy, data_range, (-1, 1))
 
 
 def clamp(x, rng=(-1, 1)):
