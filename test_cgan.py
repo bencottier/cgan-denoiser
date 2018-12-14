@@ -138,7 +138,7 @@ def generate_and_save_images(model, epoch, test_inputs, test_labels):
         plt.xticks([])
         plt.yticks([])
     
-    plt.savefig(os.path.join(data_path, 'image_at_epoch_{:04d}.png'.format(epoch)))
+    plt.savefig(os.path.join(results_path, 'image_at_epoch_{:04d}.png'.format(epoch)))
     # plt.show()
 
 
@@ -152,10 +152,8 @@ if __name__ == '__main__':
 
     # Make directories for this run
     time_string = time.strftime("%Y-%m-%d-%H-%M-%S")
-    data_path = os.path.join(config.data_path, time_string)
     model_path = os.path.join(config.model_path, time_string)
     results_path = os.path.join(config.results_path, time_string)
-    utils.safe_makedirs(data_path)
     utils.safe_makedirs(model_path)
     utils.safe_makedirs(results_path)
 
