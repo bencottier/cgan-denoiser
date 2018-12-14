@@ -7,8 +7,10 @@ Data processing for convolutional neural networks.
 author: Ben Cottier (git: bencottier)
 """
 from __future__ import absolute_import, division, print_function
+from config import ConfigCGAN as config
 import numpy as np
 import tensorflow as tf
+import scipy.misc
 import math
 
 
@@ -69,6 +71,87 @@ def padding_power_2(shape):
     """
     padded_size = next_power_2(max(shape))
     return ((padded_size - shape[0])//2, (padded_size - shape[1])//2)
+
+
+def preprocess_train_batch(labels, inputs, **kwargs):
+    labels_, labels_out = get_shaped_output(labels)
+    inputs_, inputs_out = get_shaped_output(inputs)
+    for i in range(labels_out.shape[0]):
+        labels_out[i], inputs_out[i] = preprocess_train(labels_[i], inputs_[i], **kwargs)
+    return labels_out, inputs_out
+
+
+def preprocess_train(labels, inputs, new_range=(-1, 1), current_range=None, 
+                     axis=None, cropping='random', hflip=True, vflip=False):  
+    adjust_size = (config.adjust_size, config.adjust_size)
+    train_size = (config.train_size, config.train_size)
+    # Resize as configured
+    labels = resize(labels, adjust_size)
+    inputs = resize(inputs, adjust_size)
+    # Crop to network input size for training
+    if cropping:
+        assert config.train_size < config.adjust_size
+        crop_fns = {'topleft':crop_topleft, 
+                    'center':crop_center,
+                    'random':crop_randpos}
+        labels, inputs = crop_fns.get(cropping)([labels, inputs], train_size)
+    # Random flip half of the time
+    labels, inputs = flip_random([labels, inputs], hflip, vflip)
+    # Normalise
+    labels = normalise(labels, new_range, current_range)
+    inputs = normalise(inputs, new_range, current_range)
+    return labels.astype('float32'), inputs.astype('float32')
+
+
+def get_shaped_output(data):
+    if len(data.shape) <= 3:
+        data_ = data[np.newaxis, ...]
+    else:
+        data_ = data
+    data_out = np.zeros((data_.shape[0],
+                         config.train_size,
+                         config.train_size,
+                         config.channels), dtype=np.float32)
+    return data_, data_out
+
+
+def resize(data, size):
+    if config.channels == 1:
+        data_ = data.reshape(data.shape[:2])
+        data_ = scipy.misc.imresize(data_, size)
+        data = data_[..., np.newaxis]
+    else:
+        data = scipy.misc.imresize(data, size)
+    return data
+
+
+def crop_topleft(data_list, size):
+    return crop_from_pos(data_list, (0, 0), size)
+
+
+def crop_center(data_list, size):
+    pos = ((data_list[0].shape[0] - size[0]) // 2, 
+           (data_list[0].shape[1] - size[1]) // 2)
+    return crop_from_pos(data_list, pos, size)
+
+
+def crop_randpos(data_list, size):
+    pos = (int(np.ceil(np.random.uniform(0.01, data_list[0].shape[0] - size[0]))),
+           int(np.ceil(np.random.uniform(0.01, data_list[0].shape[1] - size[1]))))
+    return crop_from_pos(data_list, pos, size)
+
+
+def crop_from_pos(data_list, pos, size):
+    return [data_list[i][pos[0]:(pos[0]+size[0]), pos[1]:(pos[1]+size[1])] 
+            for i in range(len(data_list))]
+
+
+def flip_random(data_list, hflip, vflip):
+    if hflip and np.random.random() > 0.5:
+        data_list = [np.fliplr(data_list[i]) for i in range(len(data_list))]
+    if vflip and np.random.random() > 0.5:
+        data_list = [np.fliplr(data_list[i]) for i in range(len(data_list))]
+    return data_list
 
 
 def mse(x1, x2, norm=2):
