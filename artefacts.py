@@ -32,12 +32,12 @@ def add_gaussian_noise(data, stdev=0.1, mean=0.0, data_range=(0, 1), clip=True):
     return normalise(noisy, data_range, (-1, 1))
 
 
-def add_space_noise(data, fwhm=1.4, sig=1.2):
+def add_space_noise(data, fwhm=1.4, sig=1.2, data_range=(0, 1)):
     """
     ** Requires OpenCV-Python (`cv2`) **
     Add noise to array data, approximating degradation in astronomical 
-    telescope imaging. Assumes data is at least 2D, of shape
-    ([batch size], rows, columns, [channel])
+    telescope imaging. Data must be at least 3D, of shape
+    (n, rows, columns, [channel])
 
     Based on [Schawinski et al., 2017](https://arxiv.org/abs/1702.00403)
     ([pdf](https://arxiv.org/pdf/1702.00403.pdf), 
@@ -75,7 +75,7 @@ def add_space_noise(data, fwhm=1.4, sig=1.2):
 
     if len(data.shape) == 1:
         raise ValueError("Data must be at least 2D")
-    data_temp = data[np.newaxis, ...].astype('float32')
+    data_temp = normalise(data, (-1, 1), data_range).astype('float32')
 
     for i in range(data_temp.shape[0]):
         x = data_temp[i]
@@ -110,7 +110,7 @@ def add_space_noise(data, fwhm=1.4, sig=1.2):
 
         data_temp[i] = x_degraded
 
-    return data_temp.reshape(data.shape).astype(data.dtype)
+    return data_temp.astype(data.dtype)
 
 
 if __name__ == "__main__":
