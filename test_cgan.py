@@ -170,8 +170,8 @@ if __name__ == '__main__':
                                         config.raw_size,
                                         config.channels)
     # Add noise for condition input
-    train_images = data_processing.normalise(train_images, (-1, 1), (0, 255))
     train_inputs = artefacts.add_gaussian_noise(train_images, stdev=0.2).astype('float32')
+    train_images = data_processing.normalise(train_images, (-1, 1), (0, 255))
     train_labels = train_images.astype('float32')
 
     train_dataset = tf.data.Dataset.from_tensor_slices((train_inputs, train_labels))\
@@ -182,8 +182,8 @@ if __name__ == '__main__':
                                     config.raw_size,
                                     config.raw_size,
                                     config.channels)
-    test_images = data_processing.normalise(test_images, (-1, 1), (0, 255))
     test_inputs = artefacts.add_gaussian_noise(test_images, stdev=0.2).astype('float32')
+    test_images = data_processing.normalise(test_images, (-1, 1), (0, 255))
     test_labels = test_images.astype('float32')
     # Set up some random (but consistent) test cases to monitor
     num_examples_to_generate = 16
@@ -194,7 +194,7 @@ if __name__ == '__main__':
     selected_labels = test_labels[random_indices]
     
     # Set up the models for training
-    generator = model.make_generator_model()
+    generator = model.make_generator_model_small()
     discriminator = model.make_discriminator_model()
 
     generator_optimizer = tf.train.AdamOptimizer(config.learning_rate)
