@@ -16,7 +16,7 @@ def make_generator_model():
     f = config.base_number_of_filters
     k = config.kernel_size
     s = config.strides
-    sz = config.raw_size
+    sz = config.train_size
     c = config.channels
     pad = padding_power_2((sz, sz))
 
@@ -113,7 +113,7 @@ def make_generator_model_small():
     f = config.base_number_of_filters
     k = config.kernel_size
     s = config.strides
-    sz = config.raw_size
+    sz = config.train_size
     c = config.channels
     pad = padding_power_2((sz, sz))
 
@@ -170,7 +170,7 @@ def make_discriminator_model():
     f = config.base_number_of_filters
     k = config.kernel_size
     s = config.strides
-    sz = config.raw_size
+    sz = config.train_size
     c = config.channels
 
     inputs = tf.keras.layers.Input((sz, sz, c), name="dinput")
