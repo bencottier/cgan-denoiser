@@ -7,7 +7,7 @@ Conditional Generative Adversarial Network model.
 author: Ben Cottier (git: bencottier)
 """
 from __future__ import absolute_import, division, print_function
-from config import ConfigCGAN as config
+from config import Config as config
 import tensorflow as tf
 from data_processing import padding_power_2
 

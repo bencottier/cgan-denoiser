@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-test_cgan.py
+test_undersampled.py
 
-Testing a Conditional GAN model.
+Train a neural network to remove artefacts caused by undersampling.
+We define undersampling as sampling at a frequency below the Nyquist limit.
+Methods include compressed sensing and chaotic sensing.
 
 author: Ben Cottier (git: bencottier)
 """
 from __future__ import absolute_import, division, print_function
 import artefacts
 import data_processing
-from config import ConfigCGAN as config
+from config import Config as config
 import cgan as model
 import utils
 import tensorflow as tf
@@ -138,8 +140,8 @@ def generate_and_save_images(model, epoch, test_inputs, test_labels):
         plt.xticks([])
         plt.yticks([])
     
-    # plt.savefig(os.path.join(results_path, 'image_at_epoch_{:04d}.png'.format(epoch)))  # TODO
-    plt.show()  # TODO
+    plt.savefig(os.path.join(results_path, 'image_at_epoch_{:04d}.png'.format(epoch)))  # TODO
+    # plt.show()  # TODO
 
 
 def log_metric(value, name):
@@ -148,14 +150,12 @@ def log_metric(value, name):
 
 
 if __name__ == '__main__':
-    # model_path = "out/noise_gan/model/2018-12-12-11-07-49"
-
     # Make directories for this run
     time_string = time.strftime("%Y-%m-%d-%H-%M-%S")
     model_path = os.path.join(config.model_path, time_string)
     results_path = os.path.join(config.results_path, time_string)
-    # utils.safe_makedirs(model_path)
-    # utils.safe_makedirs(results_path)
+    utils.safe_makedirs(model_path)
+    utils.safe_makedirs(results_path)
 
     # Initialise logging
     log_path = os.path.join('logs', config.exp_name, time_string)
@@ -164,39 +164,19 @@ if __name__ == '__main__':
     global_step = tf.train.get_or_create_global_step()
 
     # Load the data
-    (train_images, _), (test_images, _) = tf.keras.datasets.mnist.load_data()
-    train_images = train_images[:config.samples_train]
-    test_images = test_images[:config.samples_test]
+    (train_inputs, train_labels), (test_inputs, test_labels), _ = data_processing.get_oasis_dataset(
+        config.input_path, config.label_path, 
+        config.test_cases, config.max_training_cases, config.train_size)
 
     # Training set
-    train_images = train_images.reshape(train_images.shape[0], 
-                                        config.raw_size,
-                                        config.raw_size,
-                                        config.channels)
-    train_inputs = artefacts.add_gaussian_noise(
-        train_images, stdev=0.2, data_range=(0, 255))  # condition
-    train_labels, train_inputs = data_processing.preprocess_train_batch(
-        train_images, train_inputs, new_range=(-1, 1), current_range=(0, 255))
     train_dataset = tf.data.Dataset.from_tensor_slices((train_inputs, train_labels))\
-        .shuffle(config.samples_train).batch(config.batch_size)
+        .shuffle(config.buffer_size).batch(config.batch_size)
 
     # Test set
-    test_images = test_images.reshape(test_images.shape[0], 
-                                      config.raw_size,
-                                      config.raw_size,
-                                      config.channels)
-    test_inputs = artefacts.add_gaussian_noise(
-        test_images, stdev=0.2, data_range=(0, 255))  # condition
-    test_labels, test_inputs = data_processing.preprocess_train_batch(
-        test_images, test_inputs, new_range=(-1, 1), current_range=(0, 255))
     # Set up some random (but consistent) test cases to monitor
     num_examples_to_generate = 16
-    random_indices = np.random.choice(np.arange(test_inputs.shape[0]),
-                                      num_examples_to_generate,
-                                      replace=False)
-    selected_inputs = test_inputs[random_indices]
-    selected_labels = test_labels[random_indices]
-    generate_and_save_images(None, 0, selected_inputs, selected_labels)  # baseline TODO remove
+    selected_inputs = test_inputs
+    selected_labels = test_labels
     
     # Set up the models for training
     generator = model.make_generator_model()
@@ -212,11 +192,11 @@ if __name__ == '__main__':
                                      discriminator=discriminator)
 
     generate_and_save_images(None, 0, selected_inputs, selected_labels)  # baseline
-    # print("\nTraining...\n")
-    # # Compile training function into a callable TensorFlow graph (speeds up execution)
-    # train_step = tf.contrib.eager.defun(train_step)
-    # train(train_dataset, config.max_epoch)
-    # print("\nTraining done\n")
+    print("\nTraining...\n")
+    # Compile training function into a callable TensorFlow graph (speeds up execution)
+    train_step = tf.contrib.eager.defun(train_step)
+    train(train_dataset, config.max_epoch)
+    print("\nTraining done\n")
 
     # checkpoint.restore(tf.train.latest_checkpoint(model_path))
     # prediction = generator(selected_inputs, training=False)

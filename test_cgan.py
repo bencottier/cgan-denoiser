@@ -9,7 +9,7 @@ author: Ben Cottier (git: bencottier)
 from __future__ import absolute_import, division, print_function
 import artefacts
 import data_processing
-from config import ConfigCGAN as config
+from config import Config as config
 import cgan as model
 import utils
 import tensorflow as tf
