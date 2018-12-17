@@ -170,7 +170,8 @@ if __name__ == '__main__':
                                         config.raw_size,
                                         config.channels)
     # Add noise for condition input
-    train_inputs = artefacts.add_gaussian_noise(train_images, stdev=0.2).astype('float32')
+    train_inputs = artefacts.add_gaussian_noise(train_images, stdev=0.2, data_range=(0, 255)).astype('float32')
+    train_inputs = data_processing.normalise(train_inputs, (-1, 1), (0, 255))
     train_images = data_processing.normalise(train_images, (-1, 1), (0, 255))
     train_labels = train_images.astype('float32')
 
@@ -182,7 +183,8 @@ if __name__ == '__main__':
                                     config.raw_size,
                                     config.raw_size,
                                     config.channels)
-    test_inputs = artefacts.add_gaussian_noise(test_images, stdev=0.2).astype('float32')
+    test_inputs = artefacts.add_gaussian_noise(test_images, stdev=0.2, data_range=(0, 255)).astype('float32')
+    test_inputs = data_processing.normalise(test_inputs, (-1, 1), (0, 255))
     test_images = data_processing.normalise(test_images, (-1, 1), (0, 255))
     test_labels = test_images.astype('float32')
     # Set up some random (but consistent) test cases to monitor
