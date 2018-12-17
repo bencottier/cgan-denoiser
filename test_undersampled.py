@@ -154,8 +154,8 @@ if __name__ == '__main__':
     time_string = time.strftime("%Y-%m-%d-%H-%M-%S")
     model_path = os.path.join(config.model_path, time_string)
     results_path = os.path.join(config.results_path, time_string)
-    utils.safe_makedirs(model_path)
-    utils.safe_makedirs(results_path)
+    utils.safe_makedirs(model_path)  # TODO
+    utils.safe_makedirs(results_path)  # TODO
 
     # Initialise logging
     log_path = os.path.join('logs', config.exp_name, time_string)
@@ -164,7 +164,7 @@ if __name__ == '__main__':
     global_step = tf.train.get_or_create_global_step()
 
     # Load the data
-    (train_inputs, train_labels), (test_inputs, test_labels), _ = data_processing.get_oasis_dataset(
+    (train_inputs, train_labels), (test_inputs, test_labels), case_list = data_processing.get_oasis_dataset(
         config.input_path, config.label_path, 
         config.test_cases, config.max_training_cases, config.train_size)
 
@@ -175,8 +175,13 @@ if __name__ == '__main__':
     # Test set
     # Set up some random (but consistent) test cases to monitor
     num_examples_to_generate = 16
-    selected_inputs = test_inputs
-    selected_labels = test_labels
+    random_indices = np.random.choice(np.arange(test_inputs.shape[0]),
+                                      num_examples_to_generate,
+                                      replace=False)
+    print("Example indexes: {}".format(random_indices))
+    print("Cases numbers: {}".format(case_list))
+    selected_inputs = test_inputs[random_indices]
+    selected_labels = test_labels[random_indices]
     
     # Set up the models for training
     generator = model.make_generator_model()
