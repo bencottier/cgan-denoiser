@@ -198,33 +198,35 @@ def log_metric(value, name):
 
 
 if __name__ == '__main__':
-    model_path = "out/fractal_oasis1_cgan/model/2018-12-17-16-20-36"
-    results_path = "out/fractal_oasis1_cgan/results/2018-12-17-16-20-36"
+    # model_path = "out/fractal_oasis1_cgan/model/2018-12-17-16-20-36"
+    # results_path = "out/fractal_oasis1_cgan/results/2018-12-17-16-20-36"
 
     # Make directories for this run
-    # time_string = time.strftime("%Y-%m-%d-%H-%M-%S")
-    # model_path = os.path.join(config.model_path, time_string)
-    # results_path = os.path.join(config.results_path, time_string)
-    # utils.safe_makedirs(model_path)  # TODO
-    # utils.safe_makedirs(results_path)  # TODO
+    time_string = time.strftime("%Y-%m-%d-%H-%M-%S")
+    model_path = os.path.join(config.model_path, time_string)
+    results_path = os.path.join(config.results_path, time_string)
+    utils.safe_makedirs(model_path)
+    utils.safe_makedirs(results_path)
 
     # Initialise logging
-    # log_path = os.path.join('logs', config.exp_name, time_string)
-    # summary_writer = tf.contrib.summary.create_file_writer(log_path, flush_millis=10000)
-    # summary_writer.set_as_default()
-    # global_step = tf.train.get_or_create_global_step()
+    log_path = os.path.join('logs', config.exp_name, time_string)
+    summary_writer = tf.contrib.summary.create_file_writer(log_path, flush_millis=10000)
+    summary_writer.set_as_default()
+    global_step = tf.train.get_or_create_global_step()
 
     # Load the data
-    # (train_inputs, train_labels), (test_inputs, test_labels), case_list = data_processing.get_oasis_dataset(
-    #     config.input_path, config.label_path, 
-    #     config.test_cases, config.max_training_cases, config.train_size)
-    test_inputs, test_labels = data_processing.get_oasis_dataset_test(
+    # Train and test
+    (train_inputs, train_labels), (test_inputs, test_labels), case_list = data_processing.get_oasis_dataset(
         config.input_path, config.label_path, 
-        config.test_cases, len(config.test_cases), config.train_size)
+        config.test_cases, config.max_training_cases, config.train_size)
+    # Test only
+    # test_inputs, test_labels = data_processing.get_oasis_dataset_test(
+    #     config.input_path, config.label_path, 
+    #     config.test_cases, len(config.test_cases), config.train_size)
 
     # Training set
-    # train_dataset = tf.data.Dataset.from_tensor_slices((train_inputs, train_labels))\
-    #     .shuffle(config.buffer_size).batch(config.batch_size)
+    train_dataset = tf.data.Dataset.from_tensor_slices((train_inputs, train_labels))\
+        .shuffle(config.buffer_size).batch(config.batch_size)
 
     # Test set
     # Set up some random (but consistent) test cases to monitor
@@ -249,17 +251,17 @@ if __name__ == '__main__':
                                      discriminator=discriminator)
 
     # Train
-    # generate_and_save_images(None, 0, selected_inputs, selected_labels)  # baseline
-    # print("\nTraining...\n")
-    # # Compile training function into a callable TensorFlow graph (speeds up execution)
-    # train_step = tf.contrib.eager.defun(train_step)
-    # train(train_dataset, config.max_epoch)
-    # print("\nTraining done\n")
+    generate_and_save_images(None, 0, selected_inputs, selected_labels)  # baseline
+    print("\nTraining...\n")
+    # Compile training function into a callable TensorFlow graph (speeds up execution)
+    train_step = tf.contrib.eager.defun(train_step)
+    train(train_dataset, config.max_epoch)
+    print("\nTraining done\n")
 
     # Test
     checkpoint.restore(tf.train.latest_checkpoint(model_path))
     test(generator, test_inputs, test_labels)
-    plot_samples(generator, selected_inputs, selected_labels, n_test_samples)
-    # generate_and_save_images(generator, 0, selected_inputs, selected_labels)
+    # plot_samples(generator, selected_inputs, selected_labels, n_test_samples)
+    # generate_and_save_images(generator, config.max_epoch + 1, selected_inputs, selected_labels)
 
     print("End of main program")
