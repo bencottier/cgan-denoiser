@@ -105,6 +105,26 @@ def train(dataset, epochs):
                              selected_labels)
 
 
+def test(model, inputs, labels):
+    print("Running model on test set...")
+    prediction_time = np.zeros(inputs.shape[0], dtype=float)
+    rmse = np.zeros(inputs.shape[0], dtype=np.float64)
+    psnr = np.zeros(inputs.shape[0], dtype=np.float64)
+    for i in range(inputs.shape[0]):
+        t0 = time.time()
+        prediction = generator(inputs[i:i+1], training=False)
+        prediction_time[i] = time.time() - t0
+        rmse[i] = data_processing.rmse(labels[i:i+1], prediction, norm=2)
+        psnr[i] = data_processing.psnr(labels[i:i+1], prediction, max_diff=1)
+    print("Results over test set:")
+    print("Time mean: {:.4f} sec".format(np.mean(prediction_time)))
+    print("Time stdv: {:.4f} sec".format(math.sqrt(np.var(prediction_time))))
+    print("RMSE mean: {:.4f}".format(np.mean(rmse)))
+    print("RMSE stdv: {:.4f}".format(math.sqrt(np.var(rmse))))
+    print("PSNR mean: {:.4f} dB".format(np.mean(psnr)))
+    print("PSNR stdv: {:.4f} dB".format(math.sqrt(np.var(psnr))))
+
+
 def generate_and_save_images(model, epoch, test_inputs, test_labels):
     if model is None:
         predictions = test_inputs
@@ -144,42 +164,74 @@ def generate_and_save_images(model, epoch, test_inputs, test_labels):
     # plt.show()  # TODO
 
 
+def plot_samples(model, inputs, labels, n_samples):
+    """
+    Plot samples of a dataset with comparison and error.
+    """
+    print("Plotting samples")
+    prediction = model(inputs, training=False)
+    for i in range(n_samples):
+        fig = plt.figure(figsize=(9, 7))
+        plt.subplot(2, 2, 1)
+        plt.imshow(inputs[i, :, :, 0], vmin=-1, vmax=1, cmap='gray')
+        plt.title('Zero-fill')
+        plt.colorbar()
+        plt.subplot(2, 2, 2)
+        plt.imshow(prediction[i, :, :, 0], vmin=-1, vmax=1, cmap='gray')
+        plt.title('Conditional GAN')
+        plt.colorbar()
+        plt.subplot(2, 2, 3)
+        plt.imshow(labels[i, :, :, 0], vmin=-1, vmax=1, cmap='gray')
+        plt.title('Ground truth')
+        plt.colorbar()
+        plt.subplot(2, 2, 4)
+        plt.imshow(labels[i, :, :, 0], vmin=-1, vmax=1, cmap='gray')
+        plt.imshow(np.abs(labels[i, :, :, 0] - prediction[i, :, :, 0]), cmap='jet', alpha=0.3)
+        plt.title('Abs. error overlay')
+        plt.colorbar()
+        plt.show()
+
+
 def log_metric(value, name):
     with tf.contrib.summary.always_record_summaries():
         tf.contrib.summary.scalar(name, value)
 
 
 if __name__ == '__main__':
+    model_path = "out/fractal_oasis1_cgan/model/2018-12-17-16-20-36"
+    results_path = "out/fractal_oasis1_cgan/results/2018-12-17-16-20-36"
+
     # Make directories for this run
-    time_string = time.strftime("%Y-%m-%d-%H-%M-%S")
-    model_path = os.path.join(config.model_path, time_string)
-    results_path = os.path.join(config.results_path, time_string)
-    utils.safe_makedirs(model_path)  # TODO
-    utils.safe_makedirs(results_path)  # TODO
+    # time_string = time.strftime("%Y-%m-%d-%H-%M-%S")
+    # model_path = os.path.join(config.model_path, time_string)
+    # results_path = os.path.join(config.results_path, time_string)
+    # utils.safe_makedirs(model_path)  # TODO
+    # utils.safe_makedirs(results_path)  # TODO
 
     # Initialise logging
-    log_path = os.path.join('logs', config.exp_name, time_string)
-    summary_writer = tf.contrib.summary.create_file_writer(log_path, flush_millis=10000)
-    summary_writer.set_as_default()
-    global_step = tf.train.get_or_create_global_step()
+    # log_path = os.path.join('logs', config.exp_name, time_string)
+    # summary_writer = tf.contrib.summary.create_file_writer(log_path, flush_millis=10000)
+    # summary_writer.set_as_default()
+    # global_step = tf.train.get_or_create_global_step()
 
     # Load the data
-    (train_inputs, train_labels), (test_inputs, test_labels), case_list = data_processing.get_oasis_dataset(
+    # (train_inputs, train_labels), (test_inputs, test_labels), case_list = data_processing.get_oasis_dataset(
+    #     config.input_path, config.label_path, 
+    #     config.test_cases, config.max_training_cases, config.train_size)
+    test_inputs, test_labels = data_processing.get_oasis_dataset_test(
         config.input_path, config.label_path, 
-        config.test_cases, config.max_training_cases, config.train_size)
+        config.test_cases, len(config.test_cases), config.train_size)
 
     # Training set
-    train_dataset = tf.data.Dataset.from_tensor_slices((train_inputs, train_labels))\
-        .shuffle(config.buffer_size).batch(config.batch_size)
+    # train_dataset = tf.data.Dataset.from_tensor_slices((train_inputs, train_labels))\
+    #     .shuffle(config.buffer_size).batch(config.batch_size)
 
     # Test set
     # Set up some random (but consistent) test cases to monitor
-    num_examples_to_generate = 16
+    n_test_samples = 16
     random_indices = np.random.choice(np.arange(test_inputs.shape[0]),
-                                      num_examples_to_generate,
+                                      n_test_samples,
                                       replace=False)
-    print("Example indexes: {}".format(random_indices))
-    print("Cases numbers: {}".format(case_list))
     selected_inputs = test_inputs[random_indices]
     selected_labels = test_labels[random_indices]
     
@@ -196,26 +248,18 @@ if __name__ == '__main__':
                                      generator=generator,
                                      discriminator=discriminator)
 
-    generate_and_save_images(None, 0, selected_inputs, selected_labels)  # baseline
-    print("\nTraining...\n")
-    # Compile training function into a callable TensorFlow graph (speeds up execution)
-    train_step = tf.contrib.eager.defun(train_step)
-    train(train_dataset, config.max_epoch)
-    print("\nTraining done\n")
+    # Train
+    # generate_and_save_images(None, 0, selected_inputs, selected_labels)  # baseline
+    # print("\nTraining...\n")
+    # # Compile training function into a callable TensorFlow graph (speeds up execution)
+    # train_step = tf.contrib.eager.defun(train_step)
+    # train(train_dataset, config.max_epoch)
+    # print("\nTraining done\n")
 
-    # checkpoint.restore(tf.train.latest_checkpoint(model_path))
-    # prediction = generator(selected_inputs, training=False)
-
-    # for i in range(num_examples_to_generate):
-    #     fig = plt.figure()
-    #     plt.subplot(1, 4, 1)
-    #     plt.imshow(selected_inputs[i, :, :, 0], vmin=-1, vmax=1)
-    #     plt.subplot(1, 4, 2)
-    #     plt.imshow(prediction[i, :, :, 0], vmin=-1, vmax=1)
-    #     plt.subplot(1, 4, 3)
-    #     plt.imshow(selected_labels[i, :, :, 0], vmin=-1, vmax=1)
-    #     plt.subplot(1, 4, 4)
-    #     plt.imshow(abs(selected_labels[i, :, :, 0] - prediction[i, :, :, 0]), vmin=0, vmax=2)
-    #     plt.show()
-
+    # Test
+    checkpoint.restore(tf.train.latest_checkpoint(model_path))
+    test(generator, test_inputs, test_labels)
+    plot_samples(generator, selected_inputs, selected_labels, n_test_samples)
     # generate_and_save_images(generator, 0, selected_inputs, selected_labels)
+
+    print("End of main program")
