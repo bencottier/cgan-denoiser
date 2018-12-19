@@ -59,7 +59,7 @@ def train_step(inputs, labels):
             
         gen_d_loss = generator_d_loss(generated_output)
         gen_abs_loss = generator_abs_loss(labels, generated_images)
-        gen_loss = gen_d_loss + gen_abs_loss
+        gen_loss = gen_d_loss  # + gen_abs_loss
         gen_rmse = data_processing.rmse(labels, generated_images)
         gen_psnr = data_processing.psnr(labels, generated_images)
         disc_loss = discriminator_loss(real_output, generated_output)
