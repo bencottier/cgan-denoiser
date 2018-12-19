@@ -66,7 +66,7 @@ class Config:
 
     # Data storage
     save_per_epoch = 5
-    exp_name = 'fractal_oasis1_cgan_no_L1'
+    exp_name = 'fractal_oasis1_cgan_no_disc'
     data_path = join('out', exp_name, 'data')
     root_path = "/home/ben/projects/honours/datasets/oasis1/"  # TODO
     input_path = root_path + "slices_artefact/"
