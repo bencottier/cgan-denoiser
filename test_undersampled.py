@@ -80,12 +80,38 @@ def train_step(inputs, labels):
     discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, discriminator.variables))
 
 
-def train(dataset, epochs):
+def validate_step(inputs, labels):
+    generated_images = generator(inputs, training=False)
+
+    real_output = discriminator(labels, training=False)
+    generated_output = discriminator(generated_images, training=False)
+        
+    gen_d_loss = generator_d_loss(generated_output)
+    gen_abs_loss = generator_abs_loss(labels, generated_images)
+    gen_loss = gen_d_loss + gen_abs_loss
+    gen_rmse = data_processing.rmse(labels, generated_images)
+    gen_psnr = data_processing.psnr(labels, generated_images)
+    disc_loss = discriminator_loss(real_output, generated_output)
+
+    # Logging
+    global_step.assign_add(1)
+    log_metric(gen_d_loss, "valid/loss/generator_deception")
+    log_metric(gen_abs_loss, "valid/loss/generator_abs_error")
+    log_metric(gen_loss, "valid/loss/generator")
+    log_metric(disc_loss, "valid/loss/discriminator")
+    log_metric(gen_rmse, "valid/accuracy/rmse")
+    log_metric(gen_psnr, "valid/accuracy/psnr")
+
+
+def train(train_dataset, valid_dataset=None, epochs=1):
     for epoch in range(epochs):
         start = time.time()
 
-        for x, y in dataset.make_one_shot_iterator():
+        for x, y in train_dataset.make_one_shot_iterator():
             train_step(x, y)
+
+        for x, y in valid_dataset.make_one_shot_iterator():
+            validate_step(x, y)
 
         generate_and_save_images(generator,
                                  epoch + 1,
@@ -225,8 +251,11 @@ if __name__ == '__main__':
     #     config.test_cases, len(config.test_cases), config.train_size)
 
     # Training set
-    train_dataset = tf.data.Dataset.from_tensor_slices((train_inputs, train_labels))\
-        .shuffle(config.buffer_size).batch(config.batch_size)
+    full_dataset = tf.data.Dataset.from_tensor_slices((train_inputs, train_labels))
+    full_dataset.shuffle(config.buffer_size)
+    valid_size = int(config.validation_split * train_inputs.shape[0])
+    train_dataset = full_dataset.skip(valid_size).batch(config.batch_size)
+    valid_dataset = full_dataset.take(valid_size).batch(config.batch_size)
 
     # Test set
     # Set up some random (but consistent) test cases to monitor
@@ -255,7 +284,7 @@ if __name__ == '__main__':
     print("\nTraining...\n")
     # Compile training function into a callable TensorFlow graph (speeds up execution)
     train_step = tf.contrib.eager.defun(train_step)
-    train(train_dataset, config.max_epoch)
+    train(train_dataset, valid_dataset, config.max_epoch)
     print("\nTraining done\n")
 
     # Test
