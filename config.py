@@ -33,7 +33,7 @@ class Config:
     # Data
     buffer_size = 1425
     batch_size = 5
-    max_epoch = 50
+    max_epoch = 20
     max_training_cases = 1140
     validation_split = 0.2
     test_cases = [
@@ -65,9 +65,10 @@ class Config:
         1370, 1373, 1379, 1385, 1386, 1390, 1398, 1408, 1413, 1415]
 
     # Data storage
-    save_per_epoch = 5
-    exp_name = 'fractal_oasis1_cgan_no_disc'
+    save_per_epoch = max_epoch
+    exp_name = 'fractal_oasis1_cgan'
     data_path = join('out', exp_name, 'data')
+    # root_path = "/home/Student/s4360417/honours/datasets/oasis1/"  # TODO
     root_path = "/home/ben/projects/honours/datasets/oasis1/"  # TODO
     input_path = root_path + "slices_artefact/"
     label_path = root_path + "slices_pad/"

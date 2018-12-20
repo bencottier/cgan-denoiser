@@ -51,34 +51,54 @@ def discriminator_loss(real_output, generated_output):
 
 
 def train_step(inputs, labels):
-    with tf.GradientTape() as gen_tape:
+    with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         generated_images = generator(inputs, training=True)
 
-        gen_loss = generator_abs_loss(labels, generated_images)
+        real_output = discriminator(labels, training=True)
+        generated_output = discriminator(generated_images, training=True)
+            
+        gen_d_loss = generator_d_loss(generated_output)
+        gen_abs_loss = generator_abs_loss(labels, generated_images)
+        gen_loss = gen_d_loss + gen_abs_loss
         gen_rmse = data_processing.rmse(labels, generated_images)
         gen_psnr = data_processing.psnr(labels, generated_images)
+        disc_loss = discriminator_loss(real_output, generated_output)
 
         # Logging
         global_step.assign_add(1)
+        log_metric(gen_d_loss, "train/loss/generator_deception")
+        log_metric(gen_abs_loss, "train/loss/generator_abs_error")
         log_metric(gen_loss, "train/loss/generator")
+        log_metric(disc_loss, "train/loss/discriminator")
         log_metric(gen_rmse, "train/accuracy/rmse")
         log_metric(gen_psnr, "train/accuracy/psnr")
 
     gradients_of_generator = gen_tape.gradient(gen_loss, generator.variables)
+    gradients_of_discriminator = disc_tape.gradient(disc_loss, discriminator.variables)
 
     generator_optimizer.apply_gradients(zip(gradients_of_generator, generator.variables))
+    discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, discriminator.variables))
 
 
 def validate_step(inputs, labels):
     generated_images = generator(inputs, training=False)
 
-    gen_loss = generator_abs_loss(labels, generated_images)
+    real_output = discriminator(labels, training=False)
+    generated_output = discriminator(generated_images, training=False)
+        
+    gen_d_loss = generator_d_loss(generated_output)
+    gen_abs_loss = generator_abs_loss(labels, generated_images)
+    gen_loss = gen_d_loss + gen_abs_loss
     gen_rmse = data_processing.rmse(labels, generated_images)
     gen_psnr = data_processing.psnr(labels, generated_images)
+    disc_loss = discriminator_loss(real_output, generated_output)
 
     # Logging
     global_step.assign_add(1)
+    log_metric(gen_d_loss, "valid/loss/generator_deception")
+    log_metric(gen_abs_loss, "valid/loss/generator_abs_error")
     log_metric(gen_loss, "valid/loss/generator")
+    log_metric(disc_loss, "valid/loss/discriminator")
     log_metric(gen_rmse, "valid/accuracy/rmse")
     log_metric(gen_psnr, "valid/accuracy/psnr")
 
@@ -248,11 +268,16 @@ if __name__ == '__main__':
     
     # Set up the models for training
     generator = model.make_generator_model()
+    discriminator = model.make_discriminator_model()
 
     generator_optimizer = tf.train.AdamOptimizer(config.learning_rate)
+    discriminator_optimizer = tf.train.AdamOptimizer(config.learning_rate)
 
     checkpoint_prefix = os.path.join(model_path, "ckpt")
-    checkpoint = tf.train.Checkpoint(optimizer=generator_optimizer, model=generator)
+    checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
+                                     discriminator_optimizer=discriminator_optimizer,
+                                     generator=generator,
+                                     discriminator=discriminator)
 
     # Train
     generate_and_save_images(None, 0, selected_inputs, selected_labels)  # baseline
