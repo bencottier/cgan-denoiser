@@ -13,7 +13,7 @@ class Config:
     Configuration parameters for the Conditional GAN
     """
     # Dimensions
-    raw_size = None
+    raw_size = 256
     adjust_size = 256
     train_size = 256
     channels = 1
@@ -67,7 +67,7 @@ class Config:
     # Data storage
     save_per_epoch = max_epoch
     exp_name = 'fractal_oasis1_cgan'
-    data_path = join('out', exp_name, 'data')
+    data_path = 'data/'
     # root_path = "/home/Student/s4360417/honours/datasets/oasis1/"  # TODO
     root_path = "/home/ben/projects/honours/datasets/oasis1/"  # TODO
     input_path = root_path + "slices_artefact/"

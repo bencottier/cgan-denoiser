@@ -167,6 +167,51 @@ def flip(data_list, hflip, vflip):
     return data_list
 
 
+def imbound(im, bounds=None, center=True):
+    """
+    Crop/pad the image to the given bounds.
+
+    Arguments:
+        im: ndarray. Input image, at least 2D with width and height last.
+        bounds: tuple. New bounds to pad/crop to.
+        center: bool. When True, pad/crop about the center.
+    """
+    if not bounds:
+        m = max(im.shape[-2:])
+        shape_end = (m, m)
+    else:
+        shape_end = bounds
+    bounds = list(im.shape[:-2])
+    bounds.extend(shape_end)
+    bounds = tuple(bounds)
+    # Create a larger-dimension array to store the image
+    cropped = np.zeros(bounds, dtype=im.dtype)
+
+    a, b = bounds[-2:]
+    c, d = im.shape[-2:]
+
+    if center:
+        # Place image values about the centre of the new larger image
+
+        x_comp = min(a, c)
+        y_comp = min(b, d)
+
+        x_cl = (a - x_comp) // 2
+        x_cr = (a + x_comp) // 2
+        y_cl = (b - y_comp) // 2
+        y_cr = (b + y_comp) // 2
+        x_il = (c - x_comp) // 2
+        x_ir = (c + x_comp) // 2
+        y_il = (d - y_comp) // 2
+        y_ir = (d + y_comp) // 2
+
+        cropped[..., x_cl:x_cr, y_cl:y_cr] = im[..., x_il:x_ir, y_il:y_ir]
+    else:
+        # Place image values at top left corner of the new larger image
+        cropped[..., :min(a, c), :min(b, d)] = im[..., :min(a, c), :min(b, d)]
+    return cropped
+
+
 def mse(x1, x2, norm=2):
     return tf.reduce_mean(tf.square((x1 - x2) / norm))
 
