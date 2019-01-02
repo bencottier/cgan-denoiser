@@ -1,6 +1,7 @@
 *.png
 *.pyc
 *.h5
+*.jpg
 .vscode/
 logs/
 out/

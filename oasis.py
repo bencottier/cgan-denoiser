@@ -7,7 +7,9 @@ Methods to prepare data from OASIS Brains (https://www.oasis-brains.org/)
 author: Ben Cottier (git: bencottier)
 """
 from __future__ import absolute_import, division, print_function
-from data_processing import imbound
+from config import Config as config
+import data_processing
+import artefacts
 import utils
 import nibabel as nib
 import numpy as np
@@ -61,7 +63,7 @@ def get_scan_paths(data_path='.', file_type='nii', scan_type='', selected_runs=(
 def prepare_oasis3_dataset():
     print("Preparing OASIS3 data...")
     
-    data_path = '/home/ben/projects/honours/datasets/oasis3/exp1'
+    data_path = '/home/ben/projects/honours/datasets/oasis3/exp2'
     data_files = get_scan_paths(data_path, 'nii', 'T1w', (1, 2))
     num_scans = 30
     slice_min = 130
@@ -75,14 +77,14 @@ def prepare_oasis3_dataset():
     for i, data_file in enumerate(data_files):
         # print(nib.load(data_file).get_fdata().shape)
         if nib.load(data_file).get_fdata().shape == (176, 256, 256):
-            count += 1
-            if count > num_scans:
+            if count >= num_scans:
                 break
+            count += 1
             accepted_files.append(data_file)
     print("Found {} volumes matching criteria".format(count))
 
-    data = np.zeros((len(accepted_files) * num_slice, n, n),
-                    dtype=np.complex64)
+    data = np.zeros((len(accepted_files) * num_slice, n, n), 
+        dtype=np.float32)
 
     for i, data_file in enumerate(accepted_files):
         nimg = nib.load(data_file)
@@ -90,18 +92,22 @@ def prepare_oasis3_dataset():
         scan = nimg.get_data().astype(np.float32)
         scan_transposed = np.transpose(scan, (2, 0, 1))
         scan_sliced = scan_transposed[slice_min:slice_max, :, :]
-        scan_bounded = imbound(scan_sliced, bounds=(n, n), center=True)
+        scan_bounded = data_processing.imbound(scan_sliced, bounds=(n, n), center=True)
         data[num_slice*i: num_slice*(i+1)] = scan_bounded
 
-    import matplotlib.pyplot as plt
-    count = 0
-    for i in range(0, data.shape[0]+1, num_slice):
-        count += 1
-        print(count, i)
-        plt.imshow(np.concatenate([np.real(data[i]), np.imag(data[i])], 1),
-                   cmap='gray')
-        plt.pause(0.2)
-    plt.show()
+    data_artefact = artefacts.add_turbulence(data)
+
+    data_combined = np.zeros((data.shape[0], data.shape[1], 2*data.shape[2]))
+    save_path = os.path.join(config.data_path, 'train')
+    utils.safe_makedirs(save_path)
+    save_path = os.path.join(save_path, '{}.jpg')  # to be formatted
+    for i, (raw_label, raw_input) in enumerate(zip(data, data_artefact)):
+        raw_label_formatted = data_processing.normalise(raw_label, new_range=(0, 255)).astype(np.int)
+        raw_input_formatted = data_processing.normalise(raw_input, new_range=(0, 255)).astype(np.int)
+        data_combined[i, :, :config.raw_size] = raw_label_formatted
+        data_combined[i, :, config.raw_size:2*config.raw_size] = raw_input_formatted
+        utils.imsave(data_combined[i], save_path.format(i))
+    print('Finished loading')
 
 
 if __name__ == '__main__':
