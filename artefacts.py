@@ -8,6 +8,7 @@ author: Ben Cottier (git: bencottier)
 """
 from __future__ import absolute_import, division, print_function
 from data_processing import normalise
+import finite
 import numpy as np
 from scipy import fftpack
 from scipy.stats import norm
@@ -111,6 +112,25 @@ def add_space_noise(data, fwhm=1.4, sig=1.2, data_range=(0, 1)):
         data_temp[i] = x_degraded
 
     return data_temp.astype(data.dtype)
+
+
+def add_turbulence(slices, K=2.4, N=256):
+    lines, angles, mValues, fractal, oversampling = finite.finiteFractal(
+        N, K, sortBy='Euclidean', twoQuads=True)
+    
+    artefact_slices = np.zeros_like(slices)
+    for i, s in enumerate(slices):
+        # Take the Fourier transform to k-space
+        k_space = fftpack.fft2(s)
+        # Sample points according to fractal mask
+        k_space *= fractal
+        # Invert back to image space
+        artefact_image = fftpack.ifft2(k_space)
+        # Imaginary component is just an artefact of the IFFT, so discard it
+        artefact_image = np.real(artefact_image)
+        artefact_slices[i] = artefact_image
+    
+    return artefact_slices
 
 
 if __name__ == "__main__":
