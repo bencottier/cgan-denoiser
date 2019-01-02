@@ -163,7 +163,7 @@ def generate_and_save_images(model, epoch, test_inputs, test_labels):
     ntype = len(types)
     nrows = 4
     ncols = 8
-    fig = plt.figure(figsize=(8, 5))
+    fig, ax = plt.subplots(nrows, ncols, figsize=(8, 5))
     
     for i in range(ntype * predictions.shape[0]):
         plt.subplot(nrows, ncols, i+1)
@@ -225,7 +225,7 @@ def log_metric(value, name):
 
 if __name__ == '__main__':
     # model_path = "out/fractal_oasis1_cgan/model/2018-12-17-16-20-36"
-    # results_path = "out/fractal_oasis1_cgan/results/2018-12-17-16-20-36"
+    # model_path = "out/fractal_oasis1_cgan_no_disc/model/2018-12-20-12-39-54"
 
     # Make directories for this run
     time_string = time.strftime("%Y-%m-%d-%H-%M-%S")
@@ -278,6 +278,7 @@ if __name__ == '__main__':
                                      discriminator_optimizer=discriminator_optimizer,
                                      generator=generator,
                                      discriminator=discriminator)
+    # checkpoint = tf.train.Checkpoint(optimizer=generator_optimizer, model=generator)
 
     # Train
     generate_and_save_images(None, 0, selected_inputs, selected_labels)  # baseline
