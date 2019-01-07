@@ -106,7 +106,7 @@ def prepare_oasis3_dataset():
         raw_input_formatted = data_processing.normalise(raw_input, new_range=(0, 255)).astype(np.int)
         data_combined[i, :, :config.raw_size] = raw_label_formatted
         data_combined[i, :, config.raw_size:2*config.raw_size] = raw_input_formatted
-        utils.imsave(data_combined[i], save_path.format(i))
+        # utils.imsave(data_combined[i], save_path.format(i))  # TODO
     print('Finished loading')
 
 

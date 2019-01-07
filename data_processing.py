@@ -85,7 +85,8 @@ def preprocess_train_batch(labels, inputs, **kwargs):
 
 
 def preprocess_train(labels, inputs, new_range=(-1, 1), current_range=None, 
-                     axis=None, cropping='random', hflip=1, vflip=0):  
+                     axis=None, cropping='random', hflip=1, vflip=0, 
+                     max_translation=0, max_rotation=0):
     adjust_size = (config.adjust_size, config.adjust_size)
     train_size = (config.train_size, config.train_size)
     # Resize as configured
@@ -100,6 +101,8 @@ def preprocess_train(labels, inputs, new_range=(-1, 1), current_range=None,
         labels, inputs = crop_fns.get(cropping)([labels, inputs], train_size)
     # Image flipping
     labels, inputs = flip([labels, inputs], hflip, vflip)
+    # Translation
+    # labels, inputs = translate([labels, inputs], max_translation)
     # Normalise
     labels = normalise(labels, new_range, current_range)
     inputs = normalise(inputs, new_range, current_range)
@@ -161,10 +164,49 @@ def flip(data_list, hflip, vflip):
             else no flip) 
     """
     if (hflip == 1 and np.random.random() > 0.5) or hflip == 2:
-        data_list = [np.fliplr(data_list[i]) for i in range(len(data_list))]
+        data_list = [np.fliplr(d) for d in data_list]
     if (vflip == 1 and np.random.random() > 0.5) or vflip == 2:
-        data_list = [np.fliplr(data_list[i]) for i in range(len(data_list))]
+        data_list = [np.fliplr(d) for d in data_list]
     return data_list
+
+
+def translate_random(data_list, max_translate):
+    if max_translate:
+        tx = np.random.randint(-max_translate, max_translate + 1)
+        ty = np.random.randint(-max_translate, max_translate + 1)
+        data_list = [translate(d, tx, ty) for d in data_list]
+    return data_list
+
+
+def translate(a, tx, ty):
+    ax, ay = a.shape
+    a_ = np.zeros_like(a)
+
+    def translation_bounds(tx, ty, ax, ay):
+        return max(tx, 0), min(ax + tx, ax), max(ty, 0), min(ay + ty, ay)
+
+    x1, x2, y1, y2 = translation_bounds(-tx, -ty, ax, ay)
+    x3, x4, y3, y4 = translation_bounds(tx, ty, ax, ay)
+
+    a_[x3:x4, y3:y4] = a[x1:x2, y1:y2]
+    return a_
+
+
+def rotate_random(data_list, max_rotate):
+    if max_rotate:
+        angle = np.random.uniform(-max_rotate, max_rotate)
+        data_list = [rotate(d, angle) for d in data_list]
+    return data_list
+
+
+def rotate_rand90(data_list):
+    if np.random.random() > 0.5:
+        data_list = [rotate(d, 90) for d in data_list]
+    return data_list
+
+
+def rotate(a, degrees):
+    return scipy.misc.imrotate(a, degrees)
 
 
 def imbound(im, bounds=None, center=True):
