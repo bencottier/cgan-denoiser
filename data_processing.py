@@ -84,9 +84,21 @@ def preprocess_train_batch(labels, inputs, **kwargs):
     return labels_out, inputs_out
 
 
+def get_shaped_output(data):
+    if len(data.shape) <= 3:
+        data_ = data[np.newaxis, ...]
+    else:
+        data_ = data
+    data_out = np.zeros((data_.shape[0],
+                         config.train_size,
+                         config.train_size,
+                         config.channels), dtype=np.float32)
+    return data_, data_out
+
+
 def preprocess_train(labels, inputs, new_range=(-1, 1), current_range=None, 
-                     axis=None, cropping='random', hflip=1, vflip=0, 
-                     max_translation=0, max_rotation=0):
+                     axis=None, cropping='center', hflip=0, vflip=0, 
+                     max_translate=0, max_rotate=0):
     adjust_size = (config.adjust_size, config.adjust_size)
     train_size = (config.train_size, config.train_size)
     # Resize as configured
@@ -99,26 +111,21 @@ def preprocess_train(labels, inputs, new_range=(-1, 1), current_range=None,
                     'center':crop_center,
                     'random':crop_randpos}
         labels, inputs = crop_fns.get(cropping)([labels, inputs], train_size)
-    # Image flipping
-    labels, inputs = flip([labels, inputs], hflip, vflip)
-    # Translation
-    # labels, inputs = translate([labels, inputs], max_translation)
+    # Flip
+    if hflip or vflip:
+        labels, inputs = flip([labels, inputs], hflip, vflip)
+    # Translate
+    if max_translate:
+        labels, inputs = translate_random([labels, inputs], max_translate)
+    # Rotate
+    if max_rotate < 0:
+        labels, inputs = rotate_rand90([labels, inputs])
+    elif max_rotate > 0:
+        labels, inputs = rotate_random([labels, inputs], max_rotate)
     # Normalise
     labels = normalise(labels, new_range, current_range)
     inputs = normalise(inputs, new_range, current_range)
     return labels.astype('float32'), inputs.astype('float32')
-
-
-def get_shaped_output(data):
-    if len(data.shape) <= 3:
-        data_ = data[np.newaxis, ...]
-    else:
-        data_ = data
-    data_out = np.zeros((data_.shape[0],
-                         config.train_size,
-                         config.train_size,
-                         config.channels), dtype=np.float32)
-    return data_, data_out
 
 
 def resize(data, size):
@@ -171,10 +178,9 @@ def flip(data_list, hflip, vflip):
 
 
 def translate_random(data_list, max_translate):
-    if max_translate:
-        tx = np.random.randint(-max_translate, max_translate + 1)
-        ty = np.random.randint(-max_translate, max_translate + 1)
-        data_list = [translate(d, tx, ty) for d in data_list]
+    tx = np.random.randint(-max_translate, max_translate + 1)
+    ty = np.random.randint(-max_translate, max_translate + 1)
+    data_list = [translate(d, tx, ty) for d in data_list]
     return data_list
 
 
@@ -193,9 +199,8 @@ def translate(a, tx, ty):
 
 
 def rotate_random(data_list, max_rotate):
-    if max_rotate:
-        angle = np.random.uniform(-max_rotate, max_rotate)
-        data_list = [rotate(d, angle) for d in data_list]
+    angle = np.random.uniform(-max_rotate, max_rotate)
+    data_list = [rotate(d, angle) for d in data_list]
     return data_list
 
 
