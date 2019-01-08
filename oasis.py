@@ -10,11 +10,30 @@ from __future__ import absolute_import, division, print_function
 from config import Config as config
 import data_processing
 import artefacts
+import filenames
 import utils
 import nibabel as nib
 import numpy as np
 import os
 import time
+
+
+def preprocess(data, pad_size):
+    """
+    Process the data into an appropriate format for CNN-based models.
+    """
+    # Reverse the flipping about the x-axis caused by data reading
+    data = np.flipud(data)
+
+    # Ensure it is padded to square
+    data_rows, data_cols = data.shape
+    # print("Original shape", (data_rows, data_cols))
+    preprocessed_data = np.zeros( (pad_size, pad_size), data.dtype)
+    preprocessed_data[:data_rows, :data_cols] = data
+    # print("Padded shape", preprocessed_data.shape)
+    # Normalise to suitable value range
+    preprocessed_data = data_processing.normalise(preprocessed_data)
+    return preprocessed_data
 
 
 def get_scan_paths(data_path='.', file_type='nii', scan_type='', selected_runs=(1,)):
@@ -114,6 +133,159 @@ def prepare_oasis3_dataset(data_path, save_artefacts=False, category='train',
     for i in range(len(data_combined)):
         nib.save(nib.Nifti1Image(data_combined[i], np.eye(4)), save_path.format(i))
     print('Finished loading')
+
+
+def get_oasis1_dataset(input_path, label_path, test_cases, max_training_cases, size):
+    # Load input data
+    # Get list of filenames and case IDs from path where 3D volumes are
+    input_list, case_list = filenames.getSortedFileListAndCases(
+        input_path, 0, "*.nii.gz", True)
+    # print("Cases: {}".format(case_list))
+
+    # Load label data
+    # Get list of filenames and case IDs from path where 3D volumes are
+    label_list, case_list = filenames.getSortedFileListAndCases(
+        label_path, 0, "*.nii.gz", True)
+    
+    # Check number of inputs
+    mu = len(input_list)
+    if mu != len(label_list):
+        print("Warning: inputs and labels don't match!")
+    if mu < 1:
+        print("Error: No input data found. Exiting.")
+        quit()
+        
+    if test_cases:
+        mu -= len(test_cases) #leave 1 outs
+    if max_training_cases > 0:
+        mu = max_training_cases
+        
+    print("Loading input ...")
+    # Get initial input size, assumes all same size
+    first = nib.load(input_list[0]).get_data().astype(np.float32)
+    first = preprocess(first, size)
+    # print("Input shape:", first.shape)
+    input_rows, input_cols = first.shape
+    
+    # Use 3D array to store all inputs and labels
+    train_inputs = np.ndarray((mu, input_rows, input_cols), dtype=np.float32)
+    train_labels = np.ndarray((mu, input_rows, input_cols), dtype=np.float32)
+    test_inputs = np.ndarray((len(test_cases), input_rows, input_cols), dtype=np.float32)
+    test_labels = np.ndarray((len(test_cases), input_rows, input_cols), dtype=np.float32)
+    
+    # Process each 3D volume
+    i = 0
+    count = 0
+    out_count = 0
+    for input_name, label, _ in zip(input_list, label_list, case_list):
+        # Load MR nifti file
+        input_data = nib.load(input_name).get_data().astype(np.float32)
+        input_data = preprocess(input_data, size) 
+        # print("Slice shape:", input_data.shape)
+        # print("Loaded", image)
+
+        # Load label nifti file
+        label = nib.load(label).get_data().astype(np.float32)
+        label = preprocess(label, size) 
+        # label[label > 0] = 1.0  # binary threshold labels
+        # print("Slice shape:", label.shape)
+        # print("Loaded", label)
+
+        # Check for test case
+        if count in test_cases:
+            test_inputs[out_count] = input_data
+            test_labels[out_count] = label
+            count += 1
+            out_count += 1
+            continue
+
+        train_inputs[i] = input_data
+        train_labels[i] = label
+        i += 1 
+        count += 1
+        
+        if i == max_training_cases:
+            break
+    
+    # labels, inputs = preprocess_train_batch(labels, inputs, 
+    #                                         new_range=(-1, 1),
+    #                                         current_range=None, 
+    #                                         axis=None, cropping='topleft', 
+    #                                         hflip=0, vflip=2)
+
+    train_inputs = train_inputs[..., np.newaxis]
+    train_labels = train_labels[..., np.newaxis]
+    test_inputs = test_inputs[..., np.newaxis]
+    test_labels = test_labels[..., np.newaxis]
+
+    print("Used", i, "images for training")
+
+    return (train_inputs, train_labels), (test_inputs, test_labels), case_list
+
+
+
+def get_oasis1_dataset_test(input_path, label_path, test_cases, max_test_cases, size):
+    # Load input data
+    # Get list of filenames and case IDs from path where 3D volumes are
+    input_list, case_list = filenames.getSortedFileListAndCases(
+        input_path, 0, "*.nii.gz", True)
+    # print("Cases: {}".format(case_list))
+
+    # Load label data
+    # Get list of filenames and case IDs from path where 3D volumes are
+    label_list, case_list = filenames.getSortedFileListAndCases(
+        label_path, 0, "*.nii.gz", True)
+    
+    # Check number of inputs
+    if len(input_list) != len(label_list):
+        print("Warning: inputs and labels don't match!")
+    if len(input_list) < 1:
+        print("Error: No input data found. Exiting.")
+        quit()
+        
+    print("Loading input ...")
+    # Get initial input size, assumes all same size
+    first = nib.load(input_list[0]).get_data().astype(np.float32)
+    first = preprocess(first, size)
+    # print("Input shape:", first.shape)
+    input_rows, input_cols = first.shape
+    
+    # Use 3D array to store all inputs and labels
+    test_inputs = np.ndarray((len(test_cases), input_rows, input_cols), dtype=np.float32)
+    test_labels = np.ndarray((len(test_cases), input_rows, input_cols), dtype=np.float32)
+    
+    # Process each 3D volume
+    count = 0
+    out_count = 0
+    for input_name, label, _ in zip(input_list, label_list, case_list):
+        # Check for test case
+        if count in test_cases:
+            # Load MR nifti file
+            input_data = nib.load(input_name).get_data().astype(np.float32)
+            input_data = preprocess(input_data, size) 
+            # print("Slice shape:", input_data.shape)
+            # print("Loaded", image)
+
+            # Load label nifti file
+            label = nib.load(label).get_data().astype(np.float32)
+            label = preprocess(label, size) 
+            # label[label > 0] = 1.0  # binary threshold labels
+            # print("Slice shape:", label.shape)
+            # print("Loaded", label)
+
+            test_inputs[out_count] = input_data
+            test_labels[out_count] = label
+            out_count += 1
+            if out_count == max_test_cases:
+                break
+        count += 1
+
+    test_inputs = test_inputs[..., np.newaxis]
+    test_labels = test_labels[..., np.newaxis]
+
+    print("Used {} images for testing".format(out_count))
+
+    return test_inputs, test_labels
 
 
 if __name__ == '__main__':
