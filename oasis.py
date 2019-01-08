@@ -96,28 +96,30 @@ def prepare_oasis3_dataset(data_path, save_artefacts=False, category='train',
         data[num_slice*i: num_slice*(i+1)] = scan_bounded
 
     if save_artefacts:
+        data_combined = np.zeros((data.shape[0], data.shape[1], 2*data.shape[2]))
         start = time.time()
         data_artefact = artefacts.add_turbulence(data)
         print("Applying turbulence to {} images took {}s".format(len(data), time.time() - start))
+    else:
+        data_combined = np.zeros_like(data)
 
-    data_combined = np.zeros((data.shape[0], data.shape[1], 2*data.shape[2]))
     save_path = os.path.join(config.data_path, category)
     utils.safe_makedirs(save_path)
-    # save_path = os.path.join(save_path, '{}.jpg')  # to be formatted
     save_path = os.path.join(save_path, '{}.nii.gz')  # to be formatted
     for i, raw_label in enumerate(data):
-        raw_label_formatted = data_processing.normalise(raw_label, new_range=(0, 255)).astype(np.int)
-        data_combined[i, :, :config.raw_size] = raw_label_formatted
+        data_combined[i, :, :config.raw_size] = raw_label
     if save_artefacts:
         for i, raw_input in enumerate(data_artefact):
-            raw_input_formatted = data_processing.normalise(raw_input, new_range=(0, 255)).astype(np.int)
-            data_combined[i, :, config.raw_size:2*config.raw_size] = raw_input_formatted
+            data_combined[i, :, config.raw_size:2*config.raw_size] = raw_input
     for i in range(len(data_combined)):
-        # utils.imsave(data_combined[i], save_path.format(i))  # TODO
         nib.save(nib.Nifti1Image(data_combined[i], np.eye(4)), save_path.format(i))
     print('Finished loading')
 
 
 if __name__ == '__main__':
+    prepare_oasis3_dataset('/home/ben/projects/honours/datasets/oasis3/exp2', 
+        category='train', max_scans=24, skip=0)
+    prepare_oasis3_dataset('/home/ben/projects/honours/datasets/oasis3/exp2', 
+        category='valid', max_scans=6, skip=24)
     prepare_oasis3_dataset('/home/ben/projects/honours/datasets/oasis3/exp2', 
         category='test', max_scans=9, skip=30)
