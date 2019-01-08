@@ -77,7 +77,7 @@ def computeKatzLines(kSpace, anglesSorted, finiteAnglesSorted, K, centered = Tru
     mValues = []
     for m, angle in zip(finiteAnglesSorted, anglesSorted):
         if isKatzCriterion(N, N, angles, K):
-            print("Katz Criterion Met. Breaking")
+            # print("Katz Criterion Met. Breaking")
             break
         m, inv = farey.toFinite(angle, N)
         u, v = radon.getSliceCoordinates2(m, kSpace, centered)
@@ -118,7 +118,7 @@ def computeKatzLinesSubsets(s, kSpace, anglesSorted, finiteAnglesSorted, K, cent
     angles = []
     for m, angle in zip(finiteAnglesSorted, anglesSorted):
         if isKatzCriterion(N, N, angles, K):
-            print("Katz Criterion Met. Breaking")
+            # print("Katz Criterion Met. Breaking")
             break
         m, inv = farey.toFinite(angle, N)
         u, v = radon.getSliceCoordinates2(m, kSpace, centered)
@@ -193,7 +193,7 @@ def finiteFractal(N, K, sortBy='Euclidean', twoQuads=True, centered=False):
     kSpace = np.zeros((N,N))
     lines, angles, mValues = computeKatzLines(kSpace, anglesSorted, finiteAnglesSorted, K, centered, twoQuads)
     mu = len(lines)
-    print("Number of finite lines in fractal:", mu)
+    # print("Number of finite lines in fractal:", mu)
     
     samplesImage1 = np.zeros((N,N), np.float32)
     for line in lines:
