@@ -12,7 +12,8 @@ import filenames
 import nibabel as nib
 import numpy as np
 import tensorflow as tf
-import scipy.misc
+from PIL import Image
+import skimage
 import math
 import os
 
@@ -95,7 +96,7 @@ def get_shaped_output(data):
 
 
 def preprocess_train(labels, inputs, new_range=(-1, 1), current_range=None, 
-                     axis=None, cropping='center', hflip=0, vflip=0, 
+                     axis=None, cropping=None, hflip=0, vflip=0, 
                      max_translate=0, max_rotate=0):
     adjust_size = (config.adjust_size, config.adjust_size)
     train_size = (config.train_size, config.train_size)
@@ -129,10 +130,10 @@ def preprocess_train(labels, inputs, new_range=(-1, 1), current_range=None,
 def resize(data, size):
     if config.channels == 1:
         data_ = data.reshape(data.shape[:2])
-        data_ = scipy.misc.imresize(data_, size)
+        data_ = np.array(Image.fromarray(data_, mode='F').resize(size))
         data = data_[..., np.newaxis]
     else:
-        data = scipy.misc.imresize(data, size)
+        data = np.array(Image.fromarray(data, mode='F').resize())
     return data
 
 
@@ -209,7 +210,7 @@ def rotate_rand90(data_list):
 
 
 def rotate(a, degrees):
-    return scipy.misc.imrotate(a, degrees)
+    return skimage.transform.rotate(a, degrees)
 
 
 def imbound(im, bounds=None, center=True):
