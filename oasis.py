@@ -61,17 +61,13 @@ def get_scan_paths(data_path='.', file_type='nii', scan_type='', selected_runs=(
     return exp_data_files
 
 
-def prepare_oasis3_dataset(save_artefacts=False):
+def prepare_oasis3_dataset(data_path, save_artefacts=False, category='train',
+        max_scans=24, skip=0, shape=(176, 256, 256), 
+        slice_min=130, slice_max=170, n=256):
+
     print("Preparing OASIS3 data...")
-    
-    data_path = '/home/ben/projects/honours/datasets/oasis3/exp2'
     data_files = get_scan_paths(data_path, 'nii', 'T1w', (1, 2))
-    num_scans = 6
-    skip = 24  # skip this many scans in order of iteration
-    slice_min = 130
-    slice_max = 170
     num_slice = abs(slice_max - slice_min)
-    n = 256
 
     # Check for consistent dimensions
     count = 0
@@ -81,7 +77,7 @@ def prepare_oasis3_dataset(save_artefacts=False):
             continue
         # print(nib.load(data_file).get_fdata().shape)
         if nib.load(data_file).get_fdata().shape == (176, 256, 256):
-            if count >= num_scans:
+            if count >= max_scans:
                 break
             count += 1
             accepted_files.append(data_file)
@@ -105,7 +101,7 @@ def prepare_oasis3_dataset(save_artefacts=False):
         print("Applying turbulence to {} images took {}s".format(len(data), time.time() - start))
 
     data_combined = np.zeros((data.shape[0], data.shape[1], 2*data.shape[2]))
-    save_path = os.path.join(config.data_path, 'valid')
+    save_path = os.path.join(config.data_path, category)
     utils.safe_makedirs(save_path)
     # save_path = os.path.join(save_path, '{}.jpg')  # to be formatted
     save_path = os.path.join(save_path, '{}.nii.gz')  # to be formatted
@@ -123,4 +119,5 @@ def prepare_oasis3_dataset(save_artefacts=False):
 
 
 if __name__ == '__main__':
-    prepare_oasis3_dataset()
+    prepare_oasis3_dataset('/home/ben/projects/honours/datasets/oasis3/exp2', 
+        category='test', max_scans=9, skip=30)
