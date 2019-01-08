@@ -2,6 +2,7 @@
 *.pyc
 *.h5
 *.jpg
+*.nii*
 .vscode/
 logs/
 out/

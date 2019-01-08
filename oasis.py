@@ -14,6 +14,7 @@ import utils
 import nibabel as nib
 import numpy as np
 import os
+import time
 
 
 def get_scan_paths(data_path='.', file_type='nii', scan_type='', selected_runs=(1,)):
@@ -60,12 +61,13 @@ def get_scan_paths(data_path='.', file_type='nii', scan_type='', selected_runs=(
     return exp_data_files
 
 
-def prepare_oasis3_dataset():
+def prepare_oasis3_dataset(save_artefacts=False):
     print("Preparing OASIS3 data...")
     
     data_path = '/home/ben/projects/honours/datasets/oasis3/exp2'
     data_files = get_scan_paths(data_path, 'nii', 'T1w', (1, 2))
-    num_scans = 30
+    num_scans = 6
+    skip = 24  # skip this many scans in order of iteration
     slice_min = 130
     slice_max = 170
     num_slice = abs(slice_max - slice_min)
@@ -75,6 +77,8 @@ def prepare_oasis3_dataset():
     count = 0
     accepted_files = []
     for i, data_file in enumerate(data_files):
+        if i < skip:
+            continue
         # print(nib.load(data_file).get_fdata().shape)
         if nib.load(data_file).get_fdata().shape == (176, 256, 256):
             if count >= num_scans:
@@ -95,18 +99,26 @@ def prepare_oasis3_dataset():
         scan_bounded = data_processing.imbound(scan_sliced, bounds=(n, n), center=True)
         data[num_slice*i: num_slice*(i+1)] = scan_bounded
 
-    data_artefact = artefacts.add_turbulence(data)
+    if save_artefacts:
+        start = time.time()
+        data_artefact = artefacts.add_turbulence(data)
+        print("Applying turbulence to {} images took {}s".format(len(data), time.time() - start))
 
     data_combined = np.zeros((data.shape[0], data.shape[1], 2*data.shape[2]))
-    save_path = os.path.join(config.data_path, 'train')
+    save_path = os.path.join(config.data_path, 'valid')
     utils.safe_makedirs(save_path)
-    save_path = os.path.join(save_path, '{}.jpg')  # to be formatted
-    for i, (raw_label, raw_input) in enumerate(zip(data, data_artefact)):
+    # save_path = os.path.join(save_path, '{}.jpg')  # to be formatted
+    save_path = os.path.join(save_path, '{}.nii.gz')  # to be formatted
+    for i, raw_label in enumerate(data):
         raw_label_formatted = data_processing.normalise(raw_label, new_range=(0, 255)).astype(np.int)
-        raw_input_formatted = data_processing.normalise(raw_input, new_range=(0, 255)).astype(np.int)
         data_combined[i, :, :config.raw_size] = raw_label_formatted
-        data_combined[i, :, config.raw_size:2*config.raw_size] = raw_input_formatted
+    if save_artefacts:
+        for i, raw_input in enumerate(data_artefact):
+            raw_input_formatted = data_processing.normalise(raw_input, new_range=(0, 255)).astype(np.int)
+            data_combined[i, :, config.raw_size:2*config.raw_size] = raw_input_formatted
+    for i in range(len(data_combined)):
         # utils.imsave(data_combined[i], save_path.format(i))  # TODO
+        nib.save(nib.Nifti1Image(data_combined[i], np.eye(4)), save_path.format(i))
     print('Finished loading')
 
 
