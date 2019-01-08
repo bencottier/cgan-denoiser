@@ -77,11 +77,9 @@ def padding_power_2(shape):
 
 
 def preprocess_train_batch(labels, inputs, **kwargs):
-    labels_, labels_out = get_shaped_output(labels)
-    inputs_, inputs_out = get_shaped_output(inputs)
-    for i in range(labels_out.shape[0]):
-        labels_out[i], inputs_out[i] = preprocess_train(labels_[i], inputs_[i], **kwargs)
-    return labels_out, inputs_out
+    for i in range(labels.shape[0]):
+        labels[i], inputs[i] = preprocess_train(labels[i], inputs[i], **kwargs)
+    return labels, inputs
 
 
 def get_shaped_output(data):
