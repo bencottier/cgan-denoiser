@@ -57,12 +57,12 @@ def train_step(labels, inputs):
 
         real_output = discriminator(labels, training=True)
         generated_output = discriminator(generated_images, training=True)
-            
+
         gen_d_loss = generator_d_loss(generated_output)
         gen_abs_loss = generator_abs_loss(labels, generated_images)
         gen_loss = gen_d_loss + gen_abs_loss
-        gen_rmse = data_processing.rmse(labels, generated_images)
-        gen_psnr = data_processing.psnr(labels, generated_images)
+        gen_psnr = data_processing.psnr(labels, generated_images, 2.)
+        gen_ssim = data_processing.ssim(labels, generated_images, 2.)
         disc_loss = discriminator_loss(real_output, generated_output)
 
         # Logging
@@ -71,7 +71,7 @@ def train_step(labels, inputs):
         log_metric(gen_abs_loss, "train/loss/generator_abs_error")
         log_metric(gen_loss, "train/loss/generator")
         log_metric(disc_loss, "train/loss/discriminator")
-        log_metric(gen_rmse, "train/accuracy/rmse")
+        log_metric(gen_ssim, "train/accuracy/ssim")
         log_metric(gen_psnr, "train/accuracy/psnr")
 
     gradients_of_generator = gen_tape.gradient(gen_loss, generator.variables)
@@ -90,8 +90,8 @@ def validate_step(labels, inputs):
     gen_d_loss = generator_d_loss(generated_output)
     gen_abs_loss = generator_abs_loss(labels, generated_images)
     gen_loss = gen_d_loss + gen_abs_loss
-    gen_rmse = data_processing.rmse(labels, generated_images)
-    gen_psnr = data_processing.psnr(labels, generated_images)
+    gen_psnr = data_processing.psnr(labels, generated_images, 2.)
+    gen_ssim = data_processing.ssim(labels, generated_images, 2.)
     disc_loss = discriminator_loss(real_output, generated_output)
 
     # Logging
@@ -100,8 +100,8 @@ def validate_step(labels, inputs):
     log_metric(gen_abs_loss, "valid/loss/generator_abs_error")
     log_metric(gen_loss, "valid/loss/generator")
     log_metric(disc_loss, "valid/loss/discriminator")
-    log_metric(gen_rmse, "valid/accuracy/rmse")
     log_metric(gen_psnr, "valid/accuracy/psnr")
+    log_metric(gen_ssim, "valid/accuracy/ssim")
 
 
 def train(train_dataset, valid_dataset=None, epochs=1):
@@ -137,22 +137,23 @@ def train(train_dataset, valid_dataset=None, epochs=1):
 def test(model, dataset):
     print("Running model on test set...")
     prediction_time = np.zeros(config.n_test, dtype=float)
-    rmse = np.zeros(config.n_test, dtype=np.float64)
+    ssim = np.zeros(config.n_test, dtype=np.float64)
     psnr = np.zeros(config.n_test, dtype=np.float64)
+    ssim = np.zeros(config.n_test)
     for i, (y, x, _) in enumerate(dataset):
         y, x = data_processing.preprocess_train_batch(y, x)
         t0 = time.time()
         prediction = generator(x, training=False)
         prediction_time[i] = time.time() - t0
-        rmse[i] = data_processing.rmse(y, prediction, norm=2)
-        psnr[i] = data_processing.psnr(y, prediction, max_diff=1)
+        psnr[i] = data_processing.psnr(y, prediction, 2.)
+        ssim[i] = data_processing.ssim(y, prediction, 2.)
     print("Results over test set:")
     print("Time mean: {:.4f} sec".format(np.mean(prediction_time)))
     print("Time stdv: {:.4f} sec".format(math.sqrt(np.var(prediction_time))))
-    print("RMSE mean: {:.4f}".format(np.mean(rmse)))
-    print("RMSE stdv: {:.4f}".format(math.sqrt(np.var(rmse))))
     print("PSNR mean: {:.4f} dB".format(np.mean(psnr)))
     print("PSNR stdv: {:.4f} dB".format(math.sqrt(np.var(psnr))))
+    print("SSIM mean: {:.4f}".format(np.mean(ssim)))
+    print("SSIM stdv: {:.4f}".format(math.sqrt(np.var(ssim))))
 
 
 def generate_and_save_images(model, epoch, test_labels, test_inputs):
@@ -181,9 +182,9 @@ def generate_and_save_images(model, epoch, test_labels, test_inputs):
         for t in range(ntype):
             if row_rel == 0:
                 j = int(i / ntype)
-                rmse = data_processing.rmse(test_labels[j], predictions[j], norm=2)
-                psnr = data_processing.psnr(test_labels[j], predictions[j], max_diff=1)
-                plt.xlabel('RMSE={:.3f}\nPSNR={:.2f}'.format(rmse, psnr), fontsize=8)
+                psnr = data_processing.psnr(test_labels[j], predictions[j], 2.)
+                ssim = data_processing.ssim(test_labels[j], predictions[j], 2.)
+                plt.xlabel('PSNR={:.2f}\nSSIM={:.2f}'.format(psnr, ssim), fontsize=8)
             if row_rel == t:
                 plt.imshow(types[row_rel][idx, :, :, 0], vmin=-1, vmax=1, cmap='gray')
                 break
