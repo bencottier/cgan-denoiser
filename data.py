@@ -23,9 +23,10 @@ def load_pair(path):
 def load(path):
     for i in os.listdir(path):
         raw_label = nib.load(os.path.join(path, i)).get_data()
+        raw_label = raw_label[np.newaxis, ...]
         raw_input = artefacts.add_turbulence(raw_label)
-        raw_label = raw_label[np.newaxis, ..., np.newaxis]
-        raw_input = raw_input[np.newaxis, ..., np.newaxis]
+        raw_label = raw_label[..., np.newaxis]
+        raw_input = raw_input[..., np.newaxis]
         yield (raw_label, raw_input, i)
 
 
