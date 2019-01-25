@@ -22,22 +22,14 @@ import matplotlib.pyplot as plt
 from collections import OrderedDict
 
 
-def preprocess(data, pad_size):
-    """
-    Process the data into an appropriate format for CNN-based models.
-    """
-    # Reverse the flipping about the x-axis caused by data reading
-    data = np.flipud(data)
-
-    # Ensure it is padded to square
-    data_rows, data_cols = data.shape
-    # print("Original shape", (data_rows, data_cols))
-    preprocessed_data = np.zeros( (pad_size, pad_size), data.dtype)
-    preprocessed_data[:data_rows, :data_cols] = data
-    # print("Padded shape", preprocessed_data.shape)
-    # Normalise to suitable value range
-    preprocessed_data = data_processing.normalise(preprocessed_data)
-    return preprocessed_data
+def get_subject_number(filename):
+    # Examples
+    # sub-OAS30032_ses-d3499_T1w.nii.gz
+    # sub-OAS30001_ses-d0129_run-01_T1w_00100.png
+    try:
+        return int(filename[8:12])
+    except:
+        raise TypeError('Expected a string convertible to int: {}'.format(filename[8:12]))
 
 
 def get_scan_paths(data_path='.', file_type='nii', scan_type='', selected_runs=(1,)):
@@ -84,26 +76,36 @@ def get_scan_paths(data_path='.', file_type='nii', scan_type='', selected_runs=(
     return exp_data_files
 
 
-def prepare_oasis3_dataset(data_path, save_artefacts=False, category='train',
-        slice_min=130, slice_max=170, n=256, fmt=None, **kwargs):
-    print("Preparing OASIS3 data for {}...".format(category))
-    accepted_files, skipped, new_resume = get_nifti_files(data_path, **kwargs)
-    save_path = os.path.join(config.data_path, category)
-    utils.safe_makedirs(save_path)
-
-    for i, data_file in enumerate(accepted_files):
-        name = data_file.split('/')[-1]
-        print(name)
-        nimg = nib.load(data_file)
-        # Get the 3D image data (series of grayscale slices)
-        scan = nimg.get_data().astype(np.float32)
-        scan_transposed = np.transpose(scan, (2, 0, 1))
-        scan_sliced = scan_transposed[slice_min:slice_max, :, :]
-        scan_bounded = data_processing.imbound(scan_sliced, bounds=(n, n), center=True)
-        slice_path = os.path.join(save_path, name.replace('.nii.gz', '_{:05d}'))
-        save_slices(scan_bounded, slice_path, slice_min, save_artefacts, category, fmt)
-
-    print('Finished writing')
+def get_nifti_files(data_path, max_scans, skip, shape, 
+        data_files=None, resume=None, last_subject=None):
+    if data_files is None:
+        data_files = get_scan_paths(data_path, 'nii', 'T1w', (1, 2))
+    # Check for files meeting criteria
+    if type(resume) != int or resume < 0:
+        resume = 0
+    else:
+        print("Resuming from file #{}".format(resume))
+    new_resume = None
+    skipped = 0
+    count = 0
+    accepted_files = []
+    for i in range(resume, len(data_files)):
+        data_file = data_files[i]
+        if count >= max_scans:
+            break
+        # print(nib.load(data_file).get_fdata().shape)
+        if shape is None or nib.load(data_file).get_fdata().shape == shape:
+            if skipped < skip:
+                skipped += 1
+                continue
+            if last_subject is not None:
+                if get_subject_number(data_file.split('/')[-1]) == last_subject:
+                    skipped += 1
+                    continue
+            accepted_files.append(data_file)
+            count += 1
+    new_resume = i
+    print("Found {} volumes matching criteria".format(count))
     return accepted_files, skipped, new_resume
 
 
@@ -143,6 +145,52 @@ def save_slice(slice_array, save_path, fmt):
             writer.write(f, zlist)
     else:
         nib.save(nib.Nifti1Image(slice_array, np.eye(4)), save_path)
+
+
+def view_slices(data_path, slices, max_scans=24, skip=0, shape=None,
+        wait=False, pause=1.0):
+    print("Preparing OASIS3 data...")
+    accepted_files = get_nifti_files(data_path, max_scans, skip, shape)
+    print("Plotting slices")
+    fig = plt.figure()
+    fig.show()
+    for i, data_file in enumerate(accepted_files):
+        print("Scan {}: {}".format(i, data_file.split('/')[-1]))
+        nimg = nib.load(data_file)
+        # Get the 3D image data (series of grayscale slices)
+        scan = nimg.get_data().astype(np.float32)
+        scan_transposed = np.transpose(scan, (2, 0, 1))
+        for s in slices:
+            print("Slices {} to {}".format(s[0], s[1]))
+            for t in range(s[0], s[1]):
+                if t < 0:
+                    t = len(scan_transposed) + t
+                print("Slice {}".format(t))
+                plt.imshow(scan_transposed[t], cmap='gray')
+                fig.canvas.draw()
+                if wait:
+                    _ = raw_input("Press [enter] to continue.")
+                else:
+                    time.sleep(pause)
+    plt.close()
+
+
+def preprocess(data, pad_size):
+    """
+    Process the data into an appropriate format for CNN-based models.
+    """
+    # Reverse the flipping about the x-axis caused by data reading
+    data = np.flipud(data)
+
+    # Ensure it is padded to square
+    data_rows, data_cols = data.shape
+    # print("Original shape", (data_rows, data_cols))
+    preprocessed_data = np.zeros( (pad_size, pad_size), data.dtype)
+    preprocessed_data[:data_rows, :data_cols] = data
+    # print("Padded shape", preprocessed_data.shape)
+    # Normalise to suitable value range
+    preprocessed_data = data_processing.normalise(preprocessed_data)
+    return preprocessed_data
 
 
 def get_oasis1_dataset(input_path, label_path, test_cases, max_training_cases, size):
@@ -297,75 +345,27 @@ def get_oasis1_dataset_test(input_path, label_path, test_cases, max_test_cases, 
     return test_inputs, test_labels
 
 
-def get_nifti_files(data_path, max_scans, skip, shape, 
-        data_files=None, resume=None, last_subject=None):
-    if data_files is None:
-        data_files = get_scan_paths(data_path, 'nii', 'T1w', (1, 2))
-    # Check for files meeting criteria
-    if type(resume) != int or resume < 0:
-        resume = 0
-    else:
-        print("Resuming from file #{}".format(resume))
-    new_resume = None
-    skipped = 0
-    count = 0
-    accepted_files = []
-    for i in range(resume, len(data_files)):
-        data_file = data_files[i]
-        if count >= max_scans:
-            new_resume = i
-            break
-        # print(nib.load(data_file).get_fdata().shape)
-        if shape is None or nib.load(data_file).get_fdata().shape == shape:
-            if skipped < skip:
-                skipped += 1
-                continue
-            if last_subject is not None:
-                if get_subject_number(data_file.split('/')[-1]) == last_subject:
-                    skipped += 1
-                    continue
-            accepted_files.append(data_file)
-            count += 1
-    print("Found {} volumes matching criteria".format(count))
-    return accepted_files, skipped, new_resume
+def prepare_oasis3_dataset(data_path, save_artefacts=False, category='train',
+        slice_min=130, slice_max=170, n=256, fmt=None, **kwargs):
+    print("Preparing OASIS3 data for {}...".format(category))
+    accepted_files, skipped, new_resume = get_nifti_files(data_path, **kwargs)
+    save_path = os.path.join(config.data_path, category)
+    utils.safe_makedirs(save_path)
 
-
-def view_slices(data_path, slices, max_scans=24, skip=0, shape=None,
-        wait=False, pause=1.0):
-    print("Preparing OASIS3 data...")
-    accepted_files = get_nifti_files(data_path, max_scans, skip, shape)
-    print("Plotting slices")
-    fig = plt.figure()
-    fig.show()
     for i, data_file in enumerate(accepted_files):
-        print("Scan {}: {}".format(i, data_file.split('/')[-1]))
+        name = data_file.split('/')[-1]
+        print(name)
         nimg = nib.load(data_file)
         # Get the 3D image data (series of grayscale slices)
         scan = nimg.get_data().astype(np.float32)
         scan_transposed = np.transpose(scan, (2, 0, 1))
-        for s in slices:
-            print("Slices {} to {}".format(s[0], s[1]))
-            for t in range(s[0], s[1]):
-                if t < 0:
-                    t = len(scan_transposed) + t
-                print("Slice {}".format(t))
-                plt.imshow(scan_transposed[t], cmap='gray')
-                fig.canvas.draw()
-                if wait:
-                    _ = raw_input("Press [enter] to continue.")
-                else:
-                    time.sleep(pause)
-    plt.close()
+        scan_sliced = scan_transposed[slice_min:slice_max, :, :]
+        scan_bounded = data_processing.imbound(scan_sliced, bounds=(n, n), center=True)
+        slice_path = os.path.join(save_path, name.replace('.nii.gz', '_{:05d}'))
+        save_slices(scan_bounded, slice_path, slice_min, save_artefacts, category, fmt)
 
-
-def get_subject_number(filename):
-    # Examples
-    # sub-OAS30032_ses-d3499_T1w.nii.gz
-    # sub-OAS30001_ses-d0129_run-01_T1w_00100.png
-    try:
-        return int(filename[8:12])
-    except:
-        raise TypeError('Expected a string convertible to int: {}'.format(filename[8:12]))
+    print('Finished writing')
+    return accepted_files, skipped, new_resume
 
     
 def write_split(data_path, split=[('train', 80), ('test', 20)], **kwargs):
@@ -383,21 +383,17 @@ def write_split(data_path, split=[('train', 80), ('test', 20)], **kwargs):
 def main():
     path = '/media/ben/ARIES/datasets/oasis3/data_full'
 
-    # files = get_scan_paths(path, 'nii', 'T1w', (1, 2))
-    # for f in files:
-    #     print(f)
-
     # Save data, split into categories
     split = [('train', 160), ('train', 40), ('test', 20)]
     write_split(path, split, 
         shape=(176, 256, 256), slice_min=100, slice_max=180, n=256, fmt='png')
 
+    # Check how many valid files there are
+    # get_nifti_files(path, 1000, 0, (176, 256, 256))
+
     # View slices in plot
     # view_slices(path, slices=[(120, 180)], max_scans=10, skip=0, 
     #         shape=(176, 256, 256), wait=True)
-
-    # Check how many valid files there are
-    # get_nifti_files(path, 1000, 0, (176, 256, 256))
 
     # Compare scans with same subjects or runs
     # prepare_oasis3_dataset(path, category='s51', max_scans=1, skip=19, 
