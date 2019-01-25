@@ -85,11 +85,9 @@ def get_scan_paths(data_path='.', file_type='nii', scan_type='', selected_runs=(
 
 
 def prepare_oasis3_dataset(data_path, save_artefacts=False, category='train',
-        max_scans=24, skip=0, last_subject=None, shape=(176, 256, 256), 
-        slice_min=130, slice_max=170, n=256, fmt=None):
+        slice_min=130, slice_max=170, n=256, fmt=None, **kwargs):
     print("Preparing OASIS3 data for {}...".format(category))
-    num_slice = abs(slice_max - slice_min)
-    accepted_files, skipped = get_nifti_files(data_path, max_scans, skip, shape, last_subject)
+    accepted_files, skipped, new_resume = get_nifti_files(data_path, **kwargs)
     save_path = os.path.join(config.data_path, category)
     utils.safe_makedirs(save_path)
 
@@ -106,7 +104,7 @@ def prepare_oasis3_dataset(data_path, save_artefacts=False, category='train',
         save_slices(scan_bounded, slice_path, slice_min, save_artefacts, category, fmt)
 
     print('Finished writing')
-    return accepted_files, skipped
+    return accepted_files, skipped, new_resume
 
 
 def save_slices(volume, save_path, base_index, save_artefacts=False, category='train', fmt=None):
@@ -299,18 +297,28 @@ def get_oasis1_dataset_test(input_path, label_path, test_cases, max_test_cases, 
     return test_inputs, test_labels
 
 
-def get_nifti_files(data_path, max_scans, skip, shape, last_subject=None):
-    data_files = get_scan_paths(data_path, 'nii', 'T1w', (1, 2))
-    # Check for consistent dimensions
+def get_nifti_files(data_path, max_scans, skip, shape, 
+        data_files=None, resume=None, last_subject=None):
+    if data_files is None:
+        data_files = get_scan_paths(data_path, 'nii', 'T1w', (1, 2))
+    # Check for files meeting criteria
+    if type(resume) != int or resume < 0:
+        resume = 0
+    else:
+        print("Resuming from file #{}".format(resume))
+    new_resume = None
+    skipped = 0
     count = 0
     accepted_files = []
-    skipped = 0
-    for i, data_file in enumerate(data_files):
+    for i in range(resume, len(data_files)):
+        data_file = data_files[i]
         if count >= max_scans:
+            new_resume = i
             break
         # print(nib.load(data_file).get_fdata().shape)
         if shape is None or nib.load(data_file).get_fdata().shape == shape:
-            if i < skip:
+            if skipped < skip:
+                skipped += 1
                 continue
             if last_subject is not None:
                 if get_subject_number(data_file.split('/')[-1]) == last_subject:
@@ -319,7 +327,7 @@ def get_nifti_files(data_path, max_scans, skip, shape, last_subject=None):
             accepted_files.append(data_file)
             count += 1
     print("Found {} volumes matching criteria".format(count))
-    return accepted_files, skipped
+    return accepted_files, skipped, new_resume
 
 
 def view_slices(data_path, slices, max_scans=24, skip=0, shape=None,
@@ -360,18 +368,24 @@ def get_subject_number(filename):
         raise TypeError('Expected a string convertible to int: {}'.format(filename[8:12]))
 
     
-def write_split(path, split=[('train', 80), ('test', 20)], **kwargs):
-    skip = 0
+def write_split(data_path, split=[('train', 80), ('test', 20)], **kwargs):
+    data_files = get_scan_paths(data_path, 'nii', 'T1w', (1, 2))
     last_subject = None
+    resume = None
     for n, m in split:
-        accepted_files, skipped = prepare_oasis3_dataset(path, category=n, 
-            max_scans=m, skip=skip, last_subject=last_subject, **kwargs)
+        accepted_files, skipped, resume = prepare_oasis3_dataset(
+            data_path, category=n, save_artefacts=False,
+            max_scans=m, skip=0, data_files=data_files, resume=resume, 
+            last_subject=last_subject, **kwargs)
         last_subject = get_subject_number(accepted_files[-1].split('/')[-1])
-        skip += m + skipped
 
 
 def main():
     path = '/media/ben/ARIES/datasets/oasis3/data_full'
+
+    # files = get_scan_paths(path, 'nii', 'T1w', (1, 2))
+    # for f in files:
+    #     print(f)
 
     # Save data, split into categories
     split = [('train', 160), ('train', 40), ('test', 20)]
