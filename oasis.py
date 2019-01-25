@@ -57,7 +57,7 @@ def get_scan_paths(data_path='.', file_type='nii', scan_type='', selected_runs=(
     # Find MR data files
     data_files = []
     for root, dirs, files in os.walk(data_path):
-        for cfile in files:
+        for cfile in sorted(files):
             if ".{}".format(file_type) in cfile:
                 data_file = os.path.join(root, cfile)
                 data_files.append(data_file)
@@ -85,58 +85,52 @@ def get_scan_paths(data_path='.', file_type='nii', scan_type='', selected_runs=(
 
 
 def prepare_oasis3_dataset(data_path, save_artefacts=False, category='train',
-        max_scans=24, skip=0, shape=(176, 256, 256), 
+        max_scans=24, skip=0, last_subject=None, shape=(176, 256, 256), 
         slice_min=130, slice_max=170, n=256, fmt=None):
     print("Preparing OASIS3 data for {}...".format(category))
     num_slice = abs(slice_max - slice_min)
-    accepted_files = get_nifti_files(data_path, max_scans, skip, shape)
-    data = np.zeros((len(accepted_files) * num_slice, n, n), 
-        dtype=np.float32)
+    accepted_files, skipped = get_nifti_files(data_path, max_scans, skip, shape, last_subject)
+    save_path = os.path.join(config.data_path, category)
+    utils.safe_makedirs(save_path)
 
     for i, data_file in enumerate(accepted_files):
-        print(data_file.split('/')[-1])
+        name = data_file.split('/')[-1]
+        print(name)
         nimg = nib.load(data_file)
         # Get the 3D image data (series of grayscale slices)
         scan = nimg.get_data().astype(np.float32)
         scan_transposed = np.transpose(scan, (2, 0, 1))
         scan_sliced = scan_transposed[slice_min:slice_max, :, :]
         scan_bounded = data_processing.imbound(scan_sliced, bounds=(n, n), center=True)
-        data[num_slice*i: num_slice*(i+1)] = scan_bounded
+        slice_path = os.path.join(save_path, name.replace('.nii.gz', '_{:05d}'))
+        save_slices(scan_bounded, slice_path, slice_min, save_artefacts, category, fmt)
 
-    if save_artefacts:
-        data_combined = np.zeros((data.shape[0], data.shape[1], 2*data.shape[2]))
-        start = time.time()
-        data_artefact = artefacts.add_turbulence(data)
-        print("Applying turbulence to {} images took {}s".format(len(data), time.time() - start))
-    else:
-        data_combined = np.zeros_like(data)
+    print('Finished writing')
+    return accepted_files, skipped
 
-    save_path = os.path.join(config.data_path, category)
-    utils.safe_makedirs(save_path)
+
+def save_slices(volume, save_path, base_index, save_artefacts=False, category='train', fmt=None):
+    # TODO artefacts option
+
     # Create file name (to be formatted later)
     if fmt == 'jpg':
-        save_path = os.path.join(save_path, '{}.jpg')
+        save_path += '.jpg'
     elif fmt == 'png':
-        save_path = os.path.join(save_path, '{}.png')
+        save_path += '.png'
     else:
-        save_path = os.path.join(save_path, '{}.nii.gz')
+        save_path += '.nii.gz'
 
-    for i, raw_label in enumerate(data):
+    data = np.zeros_like(volume)
+
+    for i, target in enumerate(volume):
         if fmt == 'jpg':
-            raw_label = data_processing.normalise(raw_label, (0, 255))
+            target = data_processing.normalise(target, (0, 255))
         elif fmt == 'png':
-            raw_label = data_processing.normalise(raw_label, (0, 65535))
-        data_combined[i, :, :config.raw_size] = raw_label
-    if save_artefacts:
-        for i, raw_input in enumerate(data_artefact):
-            if fmt == 'jpg':
-                raw_input = data_processing.normalise(raw_input, (0, 255))
-            elif fmt == 'png':
-                raw_label = data_processing.normalise(raw_label, (0, 65535))            
-            data_combined[i, :, config.raw_size:2*config.raw_size] = raw_input
-    for i in range(len(data_combined)):
-        save_slice(data_combined[i], save_path.format(accepted_files[i]), fmt)
-    print('Finished loading')
+            target = data_processing.normalise(target, (0, 65535))
+        data[i] = target
+
+    for i in range(len(data)):
+        save_slice(data[i], save_path.format(base_index + i), fmt)
 
 
 def save_slice(slice_array, save_path, fmt):
@@ -305,11 +299,12 @@ def get_oasis1_dataset_test(input_path, label_path, test_cases, max_test_cases, 
     return test_inputs, test_labels
 
 
-def get_nifti_files(data_path, max_scans, skip, shape):
+def get_nifti_files(data_path, max_scans, skip, shape, last_subject=None):
     data_files = get_scan_paths(data_path, 'nii', 'T1w', (1, 2))
     # Check for consistent dimensions
     count = 0
     accepted_files = []
+    skipped = 0
     for i, data_file in enumerate(data_files):
         if count >= max_scans:
             break
@@ -317,10 +312,14 @@ def get_nifti_files(data_path, max_scans, skip, shape):
         if shape is None or nib.load(data_file).get_fdata().shape == shape:
             if i < skip:
                 continue
+            if last_subject is not None:
+                if get_subject_number(data_file.split('/')[-1]) == last_subject:
+                    skipped += 1
+                    continue
             accepted_files.append(data_file)
             count += 1
     print("Found {} volumes matching criteria".format(count))
-    return accepted_files
+    return accepted_files, skipped
 
 
 def view_slices(data_path, slices, max_scans=24, skip=0, shape=None,
@@ -351,17 +350,33 @@ def view_slices(data_path, slices, max_scans=24, skip=0, shape=None,
     plt.close()
 
 
+def get_subject_number(filename):
+    # Examples
+    # sub-OAS30032_ses-d3499_T1w.nii.gz
+    # sub-OAS30001_ses-d0129_run-01_T1w_00100.png
+    try:
+        return int(filename[8:12])
+    except:
+        raise TypeError('Expected a string convertible to int: {}'.format(filename[8:12]))
+
+    
+def write_split(path, split=[('train', 80), ('test', 20)], **kwargs):
+    skip = 0
+    last_subject = None
+    for n, m in split:
+        accepted_files, skipped = prepare_oasis3_dataset(path, category=n, 
+            max_scans=m, skip=skip, last_subject=last_subject, **kwargs)
+        last_subject = get_subject_number(accepted_files[-1].split('/')[-1])
+        skip += m + skipped
+
+
 def main():
     path = '/media/ben/ARIES/datasets/oasis3/data_full'
 
-    # 80, 20, 10
-    split = [('train', 3), ('train', 2), ('test', 2)]
-    skip = 0
-    # Create train-validate-test split
-    for n, m in split:
-        prepare_oasis3_dataset(path, category=n, max_scans=m, skip=skip, 
-            shape=(176, 256, 256), slice_min=100, slice_max=180, n=256, fmt='png')
-        skip += m
+    # Save data, split into categories
+    split = [('train', 160), ('train', 40), ('test', 20)]
+    write_split(path, split, 
+        shape=(176, 256, 256), slice_min=100, slice_max=180, n=256, fmt='png')
 
     # View slices in plot
     # view_slices(path, slices=[(120, 180)], max_scans=10, skip=0, 
