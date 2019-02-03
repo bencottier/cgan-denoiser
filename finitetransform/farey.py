@@ -5,7 +5,7 @@ The vector is stored as complex numbers with the imaginary part as p.
 The cordinate system is assumed to be matrix system with p (and hence x) along the rows.
 '''
 import math
-import numbertheory as nt #local modules
+import finitetransform.numbertheory as nt #local modules
 
 def farey(p, q):
     '''

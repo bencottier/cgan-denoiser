@@ -108,12 +108,16 @@ def train(train_dataset, valid_dataset=None, epochs=1):
     for epoch in range(epochs):
         start = time.time()
 
-        for y, x in train_dataset:
+        for y, x, _ in train_dataset:
             y, x = data_processing.preprocess_train_batch(y, x)
+            y = tf.convert_to_tensor(y)
+            x = tf.convert_to_tensor(x)
             train_step(y, x)
 
-        for y, x in valid_dataset:
+        for y, x, _ in valid_dataset:
             y, x = data_processing.preprocess_train_batch(y, x)
+            y = tf.convert_to_tensor(y)
+            x = tf.convert_to_tensor(x)
             validate_step(y, x)
 
         # generate_and_save_images(generator,

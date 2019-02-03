@@ -14,12 +14,30 @@ import filenames
 import utils
 from PIL import Image
 import png
+import imageio
+from scipy import io as sio
 import nibabel as nib
 import numpy as np
-import os
-import time
 import matplotlib.pyplot as plt
 from collections import OrderedDict
+import difflib
+import os
+import time
+
+
+MAX_UINT8 = 255
+MAX_UINT16 = 65535
+
+
+def string_minus(a, b):
+    """
+    Return a string composed of characters in string `b` 
+    that are not in string `a` (NB: not vice-versa).
+    """
+    diff = ''
+    for s in difflib.ndiff(a, b):
+        if s[0] == '+': diff += s[-1]
+    return diff
 
 
 def get_subject_number(filename):
@@ -124,9 +142,9 @@ def save_slices(volume, save_path, base_index, save_artefacts=False, category='t
 
     for i, target in enumerate(volume):
         if fmt == 'jpg':
-            target = data_processing.normalise(target, (0, 255))
+            target = data_processing.normalise(target, (0, MAX_UINT8))
         elif fmt == 'png':
-            target = data_processing.normalise(target, (0, 65535))
+            target = data_processing.normalise(target, (0, MAX_UINT16))
         data[i] = target
 
     for i in range(len(data)):
@@ -145,6 +163,58 @@ def save_slice(slice_array, save_path, fmt):
             writer.write(f, zlist)
     else:
         nib.save(nib.Nifti1Image(slice_array, np.eye(4)), save_path)
+
+
+def save_artefacts_from_images(src, dst, artefact_type, fmt='png', **kwargs):
+    utils.safe_makedirs(dst)
+    # Create sampling mask
+    if artefact_type == 'fractal':
+        sampler = artefacts.FractalRandomSampler(**kwargs)
+    else:
+        sampler = artefacts.OneDimCartesianRandomSampler(**kwargs)
+    # Open one file to get format
+    found = False
+    for dirpath, dirnames, filenames in os.walk(src):
+        for file in filenames[:1]:
+            slice_array = imageio.imread(os.path.join(dirpath, filenames[0]))
+            size = slice_array.shape[:2]
+            found = True
+        if found: break
+    # Generate and save the mask
+    sampler.generate_mask(size)
+    sio.savemat(os.path.join(dst, 'mask.mat'), {'data': sampler.mask})
+    # # Save parameters used, for reference
+    # with open(os.path.join(dst, 'parameters.txt'), 'w') as f:
+    #     for k, v in sorted(kwargs.items()):
+    #         f.write("{}: {}\n".format(k, v))
+    #     f.write("r_actual: {}\n".format(sampler.r_actual))
+    #     f.write("r_no_tile: {}\n".format(sampler.r_no_tile))
+    # # Begin processing and saving loop
+    # for dirpath, dirnames, filenames in os.walk(src):
+    #     for d in [os.path.join(dst, n) for n in dirnames]:
+    #         utils.safe_makedirs(d)
+    #     for file in filenames:
+    #         # print("Processing {}".format(file))
+    #         # Load into array
+    #         slice_array = imageio.imread(os.path.join(dirpath, file))
+    #         slice_array = slice_array.astype(np.float32)
+    #         # Process
+    #         max_val = MAX_UINT8 if fmt in ['jpg', 'jpeg'] else MAX_UINT16
+    #         slice_array = data_processing.normalise(slice_array, (0., 1.), (0, max_val))
+    #         slice_array_artefact = sampler.do_transform(slice_array)
+    #         slice_array_artefact = data_processing.normalise(
+    #                 slice_array_artefact, (0, MAX_UINT16))
+    #         imgs = {}
+    #         # Separate real and imaginary components
+    #         imgs['real'] = slice_array_artefact[..., 0]
+    #         imgs['imag'] = slice_array_artefact[..., 1]
+    #         # Save images
+    #         subpath = string_minus(src, dirpath)
+    #         if subpath[0] == '/':
+    #             subpath = subpath[1:]
+    #         save_path = os.path.join(dst, subpath, file)
+    #         for label, img in imgs.items():
+    #             save_slice(img, save_path.replace('.', '_' + label + '.'), fmt)
 
 
 def view_slices(data_path, slices, max_scans=24, skip=0, shape=None,
@@ -381,12 +451,23 @@ def write_split(data_path, split=[('train', 80), ('test', 20)], **kwargs):
 
 
 def main():
-    path = '/media/ben/ARIES/datasets/oasis3/data_full'
+    # path = '/media/ben/ARIES/datasets/oasis3/data_full'  # raw
+    src = '/home/ben/projects/honours/datasets/oasis3/exp3_png_2/ground_truth'
+
+    dst = '/home/ben/projects/honours/datasets/oasis3/exp3_png_2/artefact_fcs_{}'
+    for i, r in enumerate([0.18, 0.24, 0.36, 0.63]):
+        save_artefacts_from_images(src, dst.format(i), artefact_type='fractal',
+            k=1, K=0.2, r=r, two_quads=True, seed=0)
+
+    dst = '/home/ben/projects/honours/datasets/oasis3/exp3_png_2/artefact_ocs_{}'
+    for i, r in enumerate([5.0, 4.0, 3.0, 2.0]):
+        save_artefacts_from_images(src, dst.format(i), artefact_type='cs', 
+            r=r, r_alpha=3, axis=1, acs=3, seed=0)
 
     # Save data, split into categories
-    split = [('train', 160), ('train', 40), ('test', 20)]
-    write_split(path, split, 
-        shape=(176, 256, 256), slice_min=100, slice_max=180, n=256, fmt='png')
+    # split = [('train', 160), ('train', 40), ('test', 20)]
+    # write_split(path, split, 
+    #     shape=(176, 256, 256), slice_min=100, slice_max=180, n=256, fmt='png')
 
     # Check how many valid files there are
     # get_nifti_files(path, 1000, 0, (176, 256, 256))

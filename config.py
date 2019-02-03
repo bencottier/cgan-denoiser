@@ -41,6 +41,6 @@ class Config:
     # Data storage
     save_per_epoch = max_epoch
     exp_name = 'fractal_oasis3_cgan'
-    data_path = 'data/'
+    data_path = '/home/ben/projects/honours/datasets/oasis3/exp3_png_2'
     model_path = join('out', exp_name, 'model')
     results_path = join('out', exp_name, 'results')

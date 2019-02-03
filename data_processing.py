@@ -13,7 +13,7 @@ import nibabel as nib
 import numpy as np
 import tensorflow as tf
 from PIL import Image
-import skimage
+# import skimage
 import math
 import os
 
@@ -209,8 +209,8 @@ def rotate_rand90(data_list):
     return data_list
 
 
-def rotate(a, degrees):
-    return skimage.transform.rotate(a, degrees)
+# def rotate(a, degrees):
+#     return skimage.transform.rotate(a, degrees)
 
 
 def imbound(im, bounds=None, center=True):

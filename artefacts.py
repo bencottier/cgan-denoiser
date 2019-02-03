@@ -8,6 +8,7 @@ author: Ben Cottier (git: bencottier)
 """
 from __future__ import absolute_import, division, print_function
 from data_processing import normalise
+from finitetransform import farey, radon
 import finite
 import numpy as np
 from scipy import fftpack
@@ -114,23 +115,178 @@ def add_space_noise(data, fwhm=1.4, sig=1.2, data_range=(0, 1)):
     return data_temp.astype(data.dtype)
 
 
-def add_turbulence(slices, K=2.4, N=256):
-    lines, angles, mValues, fractal, oversampling = finite.finiteFractal(
-        N, K, sortBy='Euclidean', twoQuads=True)
+class Sampler(object):
+
+    def __init__(self, seed=0):
+        self.seed = seed
+        self.mask = None
+        self.r_no_tile = None
+        self.r_actual = None
+
+    def generate_mask(self, size):
+        raise NotImplementedError("Method must be defined in subclass.")
+
+    def sample_kspace(self, image):
+        if self.mask is None:
+            self.generate_mask(image.shape[:-2])
+        kspace_input = fftpack.fft2(image.astype(np.complex64))
+        kspace_sampled = kspace_input * self.mask
+        image_sampled = fftpack.ifft2(kspace_sampled)
+        image_sampled_real = np.real(image_sampled)[..., np.newaxis]
+        image_sampled_imag = np.imag(image_sampled)[..., np.newaxis]
+        image_sampled_cat = np.concatenate([image_sampled_real, image_sampled_imag], axis=2)
+        return image_sampled_cat.astype(np.float32)
+
+    def do_transform(self, x):
+        x = self.sample_kspace(x)
+        return x
+
+
+class OneDimCartesianRandomSampler(Sampler):
+    """
+    Transform the image to Fourier space, sample the array
+    along randomly-spaced axis-aligned lines, then convert
+    the result back to image space.
     
-    artefact_slices = np.zeros_like(slices)
-    for i, s in enumerate(slices):
-        # Take the Fourier transform to k-space
-        k_space = fftpack.fft2(s)
-        # Sample points according to fractal mask
-        k_space *= fractal
-        # Invert back to image space
-        artefact_image = fftpack.ifft2(k_space)
-        # Imaginary component is just an artefact of the IFFT, so discard it
-        artefact_image = np.real(artefact_image)
-        artefact_slices[i] = artefact_image
+    Terminology comes from the MRI domain, where this method has relevance.
+    """
     
-    return artefact_slices
+    def __init__(self, r=5.0, r_alpha=3, axis=1, acs=3, seed=0):
+        """
+        Arguments:
+            r: float. Reduction factor. A 1/r fraction of k-space will be sampled,
+                excluding the auto-calibration signal region.
+            r_alpha: float. Higher values mean lower-frequency samples are more likely.
+            axis: int. The axis the sampling lines are aligned to.
+            acs: int. Width of the auto-calibration signal region, 
+                which is fully-sampled about the center of k-space.
+            seed: int. Random seed. A positive number gives repeatable "randomness".
+        """
+        super(OneDimCartesianRandomSampler, self).__init__(seed)
+        self.r,self.r_alpha,self.axis,self.acs = r,r_alpha,axis,acs
+
+        
+    def generate_mask(self, size):
+        """
+        Generates a mask array for variable-density cartesian 1D sampling.
+        Sampling probability is proportional to the position along the sampling axis,
+        such that lower frequencies are more likely. The alpha value controls the 
+        proportionality, e.g. alpha = 1 is linear, alpha = 2 is square.
+        """
+        # Initialise
+        if self.seed >= 0:
+            np.random.seed(self.seed)
+        if type(size) != tuple or len(size) != 2:
+            raise ValueError("Size must be a 2-tuple of ints")
+        mask = np.zeros(size)
+        # Get sample coordinates
+        num_phase_encode = size[self.axis]
+        num_phase_sampled = int(np.floor(num_phase_encode / self.r))
+        coordinate_normalized = np.arange(num_phase_encode)
+        coordinate_normalized = np.abs(coordinate_normalized - num_phase_encode/2) \
+                                / (num_phase_encode/2.0)
+        prob_sample = coordinate_normalized**self.r_alpha
+        prob_sample = prob_sample / np.sum(prob_sample)
+        index_sample = np.random.choice(num_phase_encode, size=num_phase_sampled, 
+                                        replace=False, p=prob_sample)
+        # Set the samples in the mask
+        if self.axis == 0:
+            mask[index_sample, :] = 1
+        else:
+            mask[:, index_sample] = 1
+        self.r_no_tile = len(mask.flatten()) / np.sum(mask.flatten())
+        # ACS
+        acs1 = int((self.acs + 1) / 2)
+        acs2 = -int(self.acs / 2)
+        if self.axis == 0:
+            mask[:acs1, :] = 1
+            mask[acs2:, :] = 1
+        else:
+            mask[:, :acs1] = 1
+            mask[:, acs2:] = 1
+        # Compute reduction
+        self.r_actual = len(mask.flatten()) / np.sum(mask.flatten())
+        self.mask = mask
+        return mask
+    
+
+class FractalRandomSampler(Sampler):
+    """
+    Transform the image to Fourier space, sample the array
+    in a partially random fractal pattern composed of angled lines, 
+    then convert the result back to image space.
+    
+    Terminology comes from the MRI domain, where this method has relevance.
+    """
+    
+    def __init__(self, k=1, K=0.1, r=0.48, two_quads=True, seed=0):
+        """
+        Arguments:
+            k: 
+            K: float. Relates to the Katz criterion.
+                Indirectly controls the reduction factor.
+            r: float.
+            two_quads: bool. If True, generate separate patterns in two quadrants
+                instead of one.
+            seed: int. Random seed. Non-negative int for repeatable pseudo-randomness.
+        """
+        super(FractalRandomSampler, self).__init__(seed)
+        self.k,self.K,self.r,self.two_quads,self.seed = k,K,r,two_quads,seed
+        
+    def generate_mask(self, size):
+        """
+        Generates a sampling_mask array for fractal sampling.
+        The fractal is derived from Farey vectors and composed of straight
+        lines at varied angles.
+        Some lines may be randomly configured to introduce incoherence in 
+        the resulting artefacts.
+        """
+        # Initialise
+        seed = self.seed if self.seed >= 0 else None
+        np.random.seed(seed)
+        # Generate lines in fractal
+        N = size[0]
+        M = self.k * N
+        fareyVectors = farey.Farey()        
+        fareyVectors.compactOn()
+        fareyVectors.generateFiniteWithCoverage(N)
+        finiteAnglesSorted, anglesSorted = fareyVectors.sort('length')
+        powSpect = np.zeros((M, M), dtype=np.float64)
+        lines, angles, mValues = finite.computeRandomLines(
+            powSpect, anglesSorted, finiteAnglesSorted, 
+            self.r, self.K, centered=False, twoQuads=self.two_quads)
+        # Set the samples in the sampling_mask from along the lines
+        sampling_mask = np.zeros((M,M), np.float)
+        for line in lines:
+            u, v = line
+            for x, y in zip(u, v):
+                sampling_mask[x, y] += 1
+        # Determine oversampling because of power of two size
+        # This is fixed for choice of M and m values
+        oversamplingFilter = np.zeros((M,M), np.float)
+        onesSlice = np.ones(M, np.float)
+        for m in mValues:
+            radon.setSlice(m, oversamplingFilter, onesSlice, 2)
+        oversamplingFilter[oversamplingFilter==0] = 1
+        sampling_mask /= oversamplingFilter
+        sampling_mask = fftpack.fftshift(sampling_mask)
+        self.r_no_tile = len(sampling_mask.flatten()) / np.sum(sampling_mask.flatten())
+        # Tile center region further
+        radius = N/8
+        centerX = M/2
+        centerY = M/2
+        count = 0
+        for i, row in enumerate(sampling_mask):
+            for j, col in enumerate(row):
+                distance = math.sqrt( (i-float(centerX))**2 + (j-float(centerY))**2)
+                if distance < radius:
+                    if not sampling_mask[i, j] > 0: #already selected
+                        count += 1
+                        sampling_mask[i, j] = 1
+        # Compute reduction
+        self.r_actual = len(sampling_mask.flatten()) / np.sum(sampling_mask.flatten())
+        self.mask = sampling_mask
+        return sampling_mask.astype(np.uint32)
 
 
 if __name__ == "__main__":

@@ -3,8 +3,9 @@
 
 '''
 import numpy as np
-import numbertheory as nt#local modules
-import farey
+import finitetransform.numbertheory as nt #local modules
+import finitetransform.carmichael as cm #local modules
+import finitetransform.farey as farey
 import random
 
 #-------------
@@ -43,7 +44,7 @@ def drt_dyadic(image, N):
     Method is integer-only and doesn't need floats. Only uses additions and supports dyadic sizes.
     '''
     y = index = row = 0
-    bins = np.zeros( (N+int(N/2), N) )
+    bins = nt.zeros( (N+int(N/2), N) )
     
     cimage = image.ravel() #get c-style array of image
     cbins = bins.ravel() #get c-style array of image
@@ -104,16 +105,16 @@ def idrt(bins, p, norm = True):
 #-------------
 #fast versions with FFTs and NTTs
 import scipy.fftpack as fftpack
-# import pyfftw
+import pyfftw
 
-# # Monkey patch in fftn and ifftn from pyfftw.interfaces.scipy_fftpack
-# fftpack.fft2 = pyfftw.interfaces.scipy_fftpack.fft2
-# fftpack.ifft2 = pyfftw.interfaces.scipy_fftpack.ifft2
-# fftpack.fft = pyfftw.interfaces.scipy_fftpack.fft
-# fftpack.ifft = pyfftw.interfaces.scipy_fftpack.ifft
+# Monkey patch in fftn and ifftn from pyfftw.interfaces.scipy_fftpack
+fftpack.fft2 = pyfftw.interfaces.scipy_fftpack.fft2
+fftpack.ifft2 = pyfftw.interfaces.scipy_fftpack.ifft2
+fftpack.fft = pyfftw.interfaces.scipy_fftpack.fft
+fftpack.ifft = pyfftw.interfaces.scipy_fftpack.ifft
 
-# # Turn on the cache for optimum performance
-# pyfftw.interfaces.cache.enable()
+# Turn on the cache for optimum performance
+pyfftw.interfaces.cache.enable()
 
 def frt(image, N, dtype=np.float64, center=False):
     '''
@@ -123,9 +124,9 @@ def frt(image, N, dtype=np.float64, center=False):
     Assumes object is real valued
     '''
     p = 2
-    mu = int(N+N/2)
+    mu = nt.integer(N+N/2)
     if N % 2 == 1: # if odd, assume prime
-        mu = int(N+1)
+        mu = nt.integer(N+1)
         p = 0
         
     #FFT image
@@ -184,6 +185,27 @@ def ifrt(bins, N, norm = True, center = False, Isum = -1):
         result = fftpack.fftshift(result)
 
     return np.real(result)
+    
+def inrt(bins, N, norm = True, proot = cm.PRIMITIVEROOT, modulus = cm.MODULUS, maxLength = cm.MAXLENGTH):
+    '''
+    Compute the inverse DRT in O(n logn) complexity using the discrete Fourier slice theorem and the NTT.
+    Input should be DRT projections (bins) to recover an NxN image.
+    '''
+    result = nt.zeros((N,N))
+    filter = oversampling_1D_filter_Integer(N,modulus,2,False)
+#    print filter.dtype
+    
+    #Set slices (0 <= m <= N)
+    for k, row in enumerate(bins): #iterate per row
+        slice = cm.fct(row, N, cm.NTT_FORWARD, proot, modulus, maxLength)
+        slice = cm.multiply_1D(slice, filter, modulus)
+#        print "m:",k
+        setSlice_Integer(k,result,slice,modulus)
+
+    #iFNTT 2D image
+    cm.ifct_2D(result, N, proot, modulus, maxLength)
+
+    return result
 
 #-------------
 #helper functions

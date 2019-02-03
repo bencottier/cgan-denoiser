@@ -6,41 +6,24 @@ Created on Tue Sep 27 13:57:13 2016
 
 @author: uqscha22
 """
-import radon
-import farey #local module
+# import _libpath #add custom libs
+import finitetransform.mojette as mojette
+import finitetransform.radon as radon
+import finitetransform.farey as farey #local module
 from scipy import ndimage
 import scipy.fftpack as fftpack
-# import pyfftw
+import pyfftw
 import numpy as np
 import math
 
 # Monkey patch in fftn and ifftn from pyfftw.interfaces.scipy_fftpack
-# fftpack.fft2 = pyfftw.interfaces.scipy_fftpack.fft2
-# fftpack.ifft2 = pyfftw.interfaces.scipy_fftpack.ifft2
-# fftpack.fft = pyfftw.interfaces.scipy_fftpack.fft
-# fftpack.ifft = pyfftw.interfaces.scipy_fftpack.ifft
+fftpack.fft2 = pyfftw.interfaces.scipy_fftpack.fft2
+fftpack.ifft2 = pyfftw.interfaces.scipy_fftpack.ifft2
+fftpack.fft = pyfftw.interfaces.scipy_fftpack.fft
+fftpack.ifft = pyfftw.interfaces.scipy_fftpack.ifft
 
-# # Turn on the cache for optimum performance
-# pyfftw.interfaces.cache.enable()
-
-def isKatzCriterion(P, Q, angles, K = 1):
-    '''
-    Return true if angle set meets Katz criterion for exact reconstruction of
-    discrete arrays
-    '''
-    sumOfP = 0
-    sumOfQ = 0
-    n = len(angles)
-    for j in range(0, n):
-        p, q = farey.get_pq(angles[j])
-        sumOfP += abs(p)
-        sumOfQ += abs(q)
-        
-#    if max(sumOfP, sumOfQ) > max(rows, cols):
-    if sumOfP > K*P or sumOfQ > K*Q:
-        return True
-    else:
-        return False
+# Turn on the cache for optimum performance
+pyfftw.interfaces.cache.enable()
 
 def computeLines(kSpace, angles, centered = True, twoQuads = False):
     '''
@@ -76,7 +59,7 @@ def computeKatzLines(kSpace, anglesSorted, finiteAnglesSorted, K, centered = Tru
     angles = []
     mValues = []
     for m, angle in zip(finiteAnglesSorted, anglesSorted):
-        if isKatzCriterion(N, N, angles, K):
+        if mojette.isKatzCriterion(N, N, angles, K):
             # print("Katz Criterion Met. Breaking")
             break
         m, inv = farey.toFinite(angle, N)
@@ -117,7 +100,7 @@ def computeKatzLinesSubsets(s, kSpace, anglesSorted, finiteAnglesSorted, K, cent
     subsetIndex = 0 
     angles = []
     for m, angle in zip(finiteAnglesSorted, anglesSorted):
-        if isKatzCriterion(N, N, angles, K):
+        if mojette.isKatzCriterion(N, N, angles, K):
             # print("Katz Criterion Met. Breaking")
             break
         m, inv = farey.toFinite(angle, N)
@@ -173,44 +156,158 @@ def computePerpLines(kSpace, anglesSorted, finiteAnglesSorted, r, mValues, cente
     
     return linesPerp, perpAngles, sValues
 
-#fractal creation
-def finiteFractal(N, K, sortBy='Euclidean', twoQuads=True, centered=False):
+def computeRandomLines(kSpace, anglesSorted, finiteAnglesSorted, r, K=1, centered = True, twoQuads = False):
     '''
-    Create the finite fractal for image size N given the Katz criterion K
-    
-    sortBy can be 'Euclidean' for L2 norm or 'length' for L1 norm
-    twoQuads can be used to cover the half plane
-    
-    Returns lines, angles, mValues, fractal formed (as an image), oversampling filter if applicable
+    compute finite lines coordinates with random selection
+    Returns a list or list of slice 2-tuples and corresponding list of angles and m values
+    The number of lines nu is computed different to list of m values provided
     '''
-    fareyVectors = farey.Farey()        
-    fareyVectors.compactOn()
-    fareyVectors.generateFiniteWithCoverage(N)
+    N, M = kSpace.shape
+    lines = []
+    angles = []
+    mValues = []
+    for m, angle in zip(finiteAnglesSorted, anglesSorted):
+        if mojette.isKatzCriterion(N, N, angles, K):
+            # print("Katz Criterion Met. Breaking")
+            break
+        m, inv = farey.toFinite(angle, N)
+        u, v = radon.getSliceCoordinates2(m, kSpace, centered)
+        lines.append((u,v))
+        mValues.append(m)
+        angles.append(angle)
+        #second quadrant
+        if twoQuads:
+            if m != 0 and m != N: #dont repeat these
+                m = N-m
+                u, v = radon.getSliceCoordinates2(m, kSpace, centered)
+                lines.append((u,v))
+                mValues.append(m)
+                p, q = farey.get_pq(angle)
+                newAngle = farey.farey(-p,q) #not confirmed
+                angles.append(newAngle)
+    mu = len(angles)
+    # print("Number of tiled lines:", mu)
+
+    randomlines = []
+    randomAngles = []
+    randomMValues = []
+    nu = int(r*N-mu)
+    count = 0
+    while count < nu:
+        randint = 0
+        while randint in mValues or randint in randomMValues:
+            randint = np.random.randint(N, size=1)
+        m = randint[0]
+        u, v = radon.getSliceCoordinates2(m, kSpace, centered)
+        randomlines.append((u,v))
+        index = finiteAnglesSorted.index(m)
+        angle = anglesSorted[index]
+        randomAngles.append(angle)
+        randomMValues.append(m)
+        count += 1
+        if twoQuads:
+            if m != 0 and m != N: #dont repeat these
+                m = N-m
+                u, v = radon.getSliceCoordinates2(m, kSpace, centered)
+                randomlines.append((u,v))
+                randomMValues.append(m)
+                p, q = farey.get_pq(angle)
+                newAngle = farey.farey(-p,q) #not confirmed
+                randomAngles.append(newAngle)
+                count += 1
+    # print("Number of random finite lines:", len(randomAngles))
+                
+    randomlines = randomlines + lines
+    randomAngles = randomAngles + angles
+    randomMValues = randomMValues + mValues
     
-    #sort to reorder result for prettier printing
-    finiteAnglesSorted, anglesSorted = fareyVectors.sort(sortBy)
+    return randomlines, randomAngles, randomMValues
+
+def computeRandomLinesSubsets(s, kSpace, anglesSorted, finiteAnglesSorted, r, K=1, centered = True, twoQuads = False):
+    '''
+    compute finite lines coordinates with random selection
+    Returns a list or list of slice 2-tuples and corresponding list of angles and m values
+    The number of lines nu is computed different to list of m values provided
+    '''
+    #create subsets
+    subsetsLines = []
+    subsetsAngles = []
+    subsetsMValues = []
+    for i in range(s):
+        subsetsLines.append([])
+        subsetsAngles.append([])
+        subsetsMValues.append([])
     
-    kSpace = np.zeros((N,N))
-    lines, angles, mValues = computeKatzLines(kSpace, anglesSorted, finiteAnglesSorted, K, centered, twoQuads)
-    mu = len(lines)
-    # print("Number of finite lines in fractal:", mu)
+    subsetIndex = 0 
+    angles = []
+    randomMValues = []
+    N, M = kSpace.shape
+    for m, angle in zip(finiteAnglesSorted, anglesSorted):
+        if mojette.isKatzCriterion(N, N, angles, K):
+            # print("Katz Criterion Met. Breaking")
+            break
+        m, inv = farey.toFinite(angle, N)
+        u, v = radon.getSliceCoordinates2(m, kSpace, centered)
+        subsetsLines[subsetIndex].append((u,v))
+        subsetsMValues[subsetIndex].append(m)
+        randomMValues.append(m)
+        subsetsAngles[subsetIndex].append(angle)
+        angles.append(angle)
+        #second quadrant
+        if twoQuads:
+            if m != 0 and m != N: #dont repeat these
+                m = N-m
+                u, v = radon.getSliceCoordinates2(m, kSpace, centered)
+                subsetsLines[subsetIndex].append((u,v))
+                subsetsMValues[subsetIndex].append(m)
+                randomMValues.append(m)
+                p, q = farey.get_pq(angle)
+                newAngle = farey.farey(-p,q) #not confirmed
+                subsetsAngles[subsetIndex].append(angle)
+                angles.append(newAngle)
+                
+        subsetIndex += 1
+        subsetIndex %= s
+        
+    mu = len(angles)
+    # print("Number of tiled lines:", mu)
+
+    randomAngles = []
+    nu = int(r*N-mu)
+    subsetIndex = 0 
+    count = 0
+    while count < nu:
+        randint = 0
+        while randint in randomMValues:
+            randint = np.random.randint(N, size=1)
+        m = randint[0]
+        u, v = radon.getSliceCoordinates2(m, kSpace, centered)
+        subsetsLines[subsetIndex].append((u,v))
+        subsetsMValues[subsetIndex].append(m)
+        randomMValues.append(m)
+        index = finiteAnglesSorted.index(m)
+        angle = anglesSorted[index]
+        subsetsAngles[subsetIndex].append(angle)
+        randomAngles.append(angle)
+        count += 1
+        if twoQuads:
+            if m != 0 and m != N: #dont repeat these
+                m = N-m
+                u, v = radon.getSliceCoordinates2(m, kSpace, centered)
+                subsetsLines[subsetIndex].append((u,v))
+                subsetsMValues[subsetIndex].append(m)
+                randomMValues.append(m)
+                p, q = farey.get_pq(angle)
+                newAngle = farey.farey(-p,q) #not confirmed
+                subsetsAngles[subsetIndex].append(angle)
+                randomAngles.append(newAngle)
+                count += 1
+        
+        subsetIndex += 1
+        subsetIndex %= s
+    # print("Number of random finite lines:", len(randomAngles))
     
-    samplesImage1 = np.zeros((N,N), np.float32)
-    for line in lines:
-        u, v = line
-        for x, y in zip(u, v):
-            samplesImage1[x, y] += 1
-    #determine oversampling because of power of two size
-    #this is fixed for choice of M and m values
-    oversamplingFilter = np.zeros((N,N), np.uint32)
-    onesSlice = np.ones(N, np.uint32)
-    for m in mValues:
-        radon.setSlice(m, oversamplingFilter, onesSlice, 2)
-    oversamplingFilter[oversamplingFilter==0] = 1
-    samplesImage1 /= oversamplingFilter
-#    samplesImage1 = fftpack.fftshift(samplesImage1)
-    
-    return lines, angles, mValues, samplesImage1, oversamplingFilter
+    return subsetsLines, subsetsAngles, subsetsMValues
     
 # Measure finite slices
 def measureSlices(dftSpace, lines, mValues, dtype=np.float64):
@@ -343,6 +440,7 @@ def ifrt(bins, N, norm = True, center = False, Isum = -1, mValues=None, oversamp
     
     #exact filter (usually for non-prime sizes)
     if oversampleFilter is not None:
+#        print("OVERSAMPLING!")
         dftSpace /= oversampleFilter
     else:
         dftSpace[0,0] -= float(Isum)*N
