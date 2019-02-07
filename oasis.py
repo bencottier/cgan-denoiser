@@ -183,38 +183,38 @@ def save_artefacts_from_images(src, dst, artefact_type, fmt='png', **kwargs):
     # Generate and save the mask
     sampler.generate_mask(size)
     sio.savemat(os.path.join(dst, 'mask.mat'), {'data': sampler.mask})
-    # # Save parameters used, for reference
-    # with open(os.path.join(dst, 'parameters.txt'), 'w') as f:
-    #     for k, v in sorted(kwargs.items()):
-    #         f.write("{}: {}\n".format(k, v))
-    #     f.write("r_actual: {}\n".format(sampler.r_actual))
-    #     f.write("r_no_tile: {}\n".format(sampler.r_no_tile))
-    # # Begin processing and saving loop
-    # for dirpath, dirnames, filenames in os.walk(src):
-    #     for d in [os.path.join(dst, n) for n in dirnames]:
-    #         utils.safe_makedirs(d)
-    #     for file in filenames:
-    #         # print("Processing {}".format(file))
-    #         # Load into array
-    #         slice_array = imageio.imread(os.path.join(dirpath, file))
-    #         slice_array = slice_array.astype(np.float32)
-    #         # Process
-    #         max_val = MAX_UINT8 if fmt in ['jpg', 'jpeg'] else MAX_UINT16
-    #         slice_array = data_processing.normalise(slice_array, (0., 1.), (0, max_val))
-    #         slice_array_artefact = sampler.do_transform(slice_array)
-    #         slice_array_artefact = data_processing.normalise(
-    #                 slice_array_artefact, (0, MAX_UINT16))
-    #         imgs = {}
-    #         # Separate real and imaginary components
-    #         imgs['real'] = slice_array_artefact[..., 0]
-    #         imgs['imag'] = slice_array_artefact[..., 1]
-    #         # Save images
-    #         subpath = string_minus(src, dirpath)
-    #         if subpath[0] == '/':
-    #             subpath = subpath[1:]
-    #         save_path = os.path.join(dst, subpath, file)
-    #         for label, img in imgs.items():
-    #             save_slice(img, save_path.replace('.', '_' + label + '.'), fmt)
+    # Save parameters used, for reference
+    with open(os.path.join(dst, 'parameters.txt'), 'w') as f:
+        for k, v in sorted(kwargs.items()):
+            f.write("{}: {}\n".format(k, v))
+        f.write("r_actual: {}\n".format(sampler.r_actual))
+        f.write("r_no_tile: {}\n".format(sampler.r_no_tile))
+    # Begin processing and saving loop
+    for dirpath, dirnames, filenames in os.walk(src):
+        for d in [os.path.join(dst, n) for n in dirnames]:
+            utils.safe_makedirs(d)
+        for file in filenames:
+            # print("Processing {}".format(file))
+            # Load into array
+            slice_array = imageio.imread(os.path.join(dirpath, file))
+            slice_array = slice_array.astype(np.float32)
+            # Process
+            max_val = MAX_UINT8 if fmt in ['jpg', 'jpeg'] else MAX_UINT16
+            slice_array = data_processing.normalise(slice_array, (0., 1.), (0, max_val))
+            slice_array_artefact = sampler.do_transform(slice_array)
+            slice_array_artefact = data_processing.normalise(
+                    slice_array_artefact, (0, MAX_UINT16))
+            imgs = {}
+            # Separate real and imaginary components
+            imgs['real'] = slice_array_artefact[..., 0]
+            imgs['imag'] = slice_array_artefact[..., 1]
+            # Save images
+            subpath = string_minus(src, dirpath)
+            if subpath[0] == '/':
+                subpath = subpath[1:]
+            save_path = os.path.join(dst, subpath, file)
+            for label, img in imgs.items():
+                save_slice(img, save_path.replace('.', '_' + label + '.'), fmt)
 
 
 def view_slices(data_path, slices, max_scans=24, skip=0, shape=None,
@@ -452,17 +452,17 @@ def write_split(data_path, split=[('train', 80), ('test', 20)], **kwargs):
 
 def main():
     # path = '/media/ben/ARIES/datasets/oasis3/data_full'  # raw
-    src = '/home/ben/projects/honours/datasets/oasis3/exp3_png_2/ground_truth'
+    src = '/media/ben/ARIES/datasets/oasis3/exp3_png_3/ground_truth'
 
-    dst = '/home/ben/projects/honours/datasets/oasis3/exp3_png_2/artefact_fcs_{}'
+    dst = '/media/ben/ARIES/datasets/oasis3/exp3_png_3/artefact_fcs_{}'
     for i, r in enumerate([0.18, 0.24, 0.36, 0.63]):
         save_artefacts_from_images(src, dst.format(i), artefact_type='fractal',
-            k=1, K=0.2, r=r, two_quads=True, seed=0)
+            k=1, K=0.2, r=r, ctr=1/12, two_quads=True, seed=0)
 
-    dst = '/home/ben/projects/honours/datasets/oasis3/exp3_png_2/artefact_ocs_{}'
+    dst = '/media/ben/ARIES/datasets/oasis3/exp3_png_3/artefact_ocs_{}'
     for i, r in enumerate([5.0, 4.0, 3.0, 2.0]):
         save_artefacts_from_images(src, dst.format(i), artefact_type='cs', 
-            r=r, r_alpha=3, axis=1, acs=3, seed=0)
+            r=r, r_alpha=2, axis=1, acs=3, seed=0)
 
     # Save data, split into categories
     # split = [('train', 160), ('train', 40), ('test', 20)]
