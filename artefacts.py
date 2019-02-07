@@ -219,19 +219,20 @@ class FractalRandomSampler(Sampler):
     Terminology comes from the MRI domain, where this method has relevance.
     """
     
-    def __init__(self, k=1, K=0.1, r=0.48, two_quads=True, seed=0):
+    def __init__(self, k=1, K=0.1, r=0.48, ctr=1/8, two_quads=True, seed=0):
         """
         Arguments:
             k: 
             K: float. Relates to the Katz criterion.
                 Indirectly controls the reduction factor.
             r: float.
+            ctr: float. Centre tiling radius as a fraction of the image height.
             two_quads: bool. If True, generate separate patterns in two quadrants
                 instead of one.
             seed: int. Random seed. Non-negative int for repeatable pseudo-randomness.
         """
         super(FractalRandomSampler, self).__init__(seed)
-        self.k,self.K,self.r,self.two_quads,self.seed = k,K,r,two_quads,seed
+        self.k,self.K,self.r,self.ctr,self.two_quads,self.seed = k,K,r,ctr,two_quads,seed
         
     def generate_mask(self, size):
         """
@@ -272,7 +273,7 @@ class FractalRandomSampler(Sampler):
         sampling_mask = fftpack.fftshift(sampling_mask)
         self.r_no_tile = len(sampling_mask.flatten()) / np.sum(sampling_mask.flatten())
         # Tile center region further
-        radius = N/8
+        radius = self.ctr * N
         centerX = M/2
         centerY = M/2
         count = 0
@@ -284,6 +285,7 @@ class FractalRandomSampler(Sampler):
                         count += 1
                         sampling_mask[i, j] = 1
         # Compute reduction
+        sampling_mask = fftpack.ifftshift(sampling_mask)
         self.r_actual = len(sampling_mask.flatten()) / np.sum(sampling_mask.flatten())
         self.mask = sampling_mask
         return sampling_mask.astype(np.uint32)
