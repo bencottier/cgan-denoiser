@@ -62,7 +62,8 @@ def train_step(labels, inputs):
         gen_abs_loss = generator_abs_loss(labels, generated_images)
         gen_loss = gen_d_loss + gen_abs_loss
         gen_psnr = data_processing.psnr(labels, generated_images, 2.)
-        gen_ssim = data_processing.ssim(labels, generated_images, 2.)
+        gen_rmse = data_processing.rmse(labels, generated_images, 2.)
+        # gen_ssim = data_processing.ssim(labels, generated_images, 2.)
         disc_loss = discriminator_loss(real_output, generated_output)
 
         # Logging
@@ -71,7 +72,7 @@ def train_step(labels, inputs):
         log_metric(gen_abs_loss, "train/loss/generator_abs_error")
         log_metric(gen_loss, "train/loss/generator")
         log_metric(disc_loss, "train/loss/discriminator")
-        log_metric(gen_ssim, "train/accuracy/ssim")
+        # log_metric(gen_ssim, "train/accuracy/ssim")
         log_metric(gen_psnr, "train/accuracy/psnr")
 
     gradients_of_generator = gen_tape.gradient(gen_loss, generator.variables)
@@ -108,16 +109,16 @@ def train(train_dataset, valid_dataset=None, epochs=1):
     for epoch in range(epochs):
         start = time.time()
 
-        for y, x, _ in train_dataset:
-            y, x = data_processing.preprocess_train_batch(y, x)
-            y = tf.convert_to_tensor(y)
-            x = tf.convert_to_tensor(x)
+        for y, x, _ in train_dataset.make_one_shot_iterator():
+            y, x = data_processing.preprocess_train_batch(y.numpy(), x.numpy())
+            y = tf.multiply(y, 1)  # ensures correct type
+            x = tf.multiply(x, 1)
             train_step(y, x)
 
-        for y, x, _ in valid_dataset:
-            y, x = data_processing.preprocess_train_batch(y, x)
-            y = tf.convert_to_tensor(y)
-            x = tf.convert_to_tensor(x)
+        for y, x, _ in valid_dataset.make_one_shot_iterator():
+            y, x = data_processing.preprocess_train_batch(y.numpy(), x.numpy())
+            y = tf.multiply(y, 1)
+            x = tf.multiply(x, 1)
             validate_step(y, x)
 
         # generate_and_save_images(generator,
@@ -144,7 +145,7 @@ def test(model, dataset):
     ssim = np.zeros(config.n_test, dtype=np.float64)
     psnr = np.zeros(config.n_test, dtype=np.float64)
     ssim = np.zeros(config.n_test)
-    for i, (y, x, _) in enumerate(dataset):
+    for i, (y, x, _) in enumerate(dataset.make_one_shot_iterator()):
         y, x = data_processing.preprocess_train_batch(y, x)
         t0 = time.time()
         prediction = generator(x, training=False)
@@ -250,9 +251,10 @@ if __name__ == '__main__':
 
     # Load the data
     dataset = data.load_data()
-    train_dataset = dataset["train"]()
-    valid_dataset = dataset["valid"]()
-    test_dataset = dataset["test"]()
+    dtypes = (tf.float32, tf.float32, tf.string)
+    train_dataset = tf.data.Dataset.from_generator(dataset["train"], dtypes)
+    valid_dataset = tf.data.Dataset.from_generator(dataset["valid"], dtypes)
+    test_dataset = tf.data.Dataset.from_generator(dataset["test"], dtypes)
 
     # Test set
     # Set up some random (but consistent) test cases to monitor
@@ -291,6 +293,7 @@ if __name__ == '__main__':
     # generate_and_save_images(None, 0, selected_labels, selected_inputs)  # baseline
     print("\nTraining...\n")
     # Compile training function into a callable TensorFlow graph (speeds up execution)
+    # WARNING: will cause error if you call data_processing.ssim in train_step
     train_step = tf.contrib.eager.defun(train_step)
     train(train_dataset, valid_dataset, config.max_epoch)
     print("\nTraining done\n")
