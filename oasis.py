@@ -167,11 +167,6 @@ def save_slice(slice_array, save_path, fmt):
 
 def save_artefacts_from_images(src, dst, artefact_type, fmt='png', **kwargs):
     utils.safe_makedirs(dst)
-    # Create sampling mask
-    if artefact_type == 'fractal':
-        sampler = artefacts.FractalRandomSampler(**kwargs)
-    else:
-        sampler = artefacts.OneDimCartesianRandomSampler(**kwargs)
     # Open one file to get format
     found = False
     for dirpath, dirnames, filenames in os.walk(src):
@@ -180,15 +175,8 @@ def save_artefacts_from_images(src, dst, artefact_type, fmt='png', **kwargs):
             size = slice_array.shape[:2]
             found = True
         if found: break
-    # Generate and save the mask
-    sampler.generate_mask(size)
-    sio.savemat(os.path.join(dst, 'mask.mat'), {'data': sampler.mask})
-    # Save parameters used, for reference
-    with open(os.path.join(dst, 'parameters.txt'), 'w') as f:
-        for k, v in sorted(kwargs.items()):
-            f.write("{}: {}\n".format(k, v))
-        f.write("r_actual: {}\n".format(sampler.r_actual))
-        f.write("r_no_tile: {}\n".format(sampler.r_no_tile))
+            # Create sampling mask
+    sampler = save_sampling_mask(dst, artefact_type, size, **kwargs)
     # Begin processing and saving loop
     for dirpath, dirnames, filenames in os.walk(src):
         for d in [os.path.join(dst, n) for n in dirnames]:
@@ -215,6 +203,25 @@ def save_artefacts_from_images(src, dst, artefact_type, fmt='png', **kwargs):
             save_path = os.path.join(dst, subpath, file)
             for label, img in imgs.items():
                 save_slice(img, save_path.replace('.', '_' + label + '.'), fmt)
+
+
+def save_sampling_mask(path, artefact_type, size, **kwargs):
+    utils.safe_makedirs(path)
+    # Create sampling mask
+    if artefact_type == 'fractal':
+        sampler = artefacts.FractalRandomSampler(**kwargs)
+    else:
+        sampler = artefacts.OneDimCartesianRandomSampler(**kwargs)
+    # Generate and save the mask
+    sampler.generate_mask(size)
+    sio.savemat(os.path.join(path, 'mask.mat'), {'data': sampler.mask})
+    # Save parameters used, for reference
+    with open(os.path.join(path, 'parameters.txt'), 'w') as f:
+        for k, v in sorted(kwargs.items()):
+            f.write("{}: {}\n".format(k, v))
+        f.write("r_actual: {}\n".format(sampler.r_actual))
+        f.write("r_no_tile: {}\n".format(sampler.r_no_tile))
+    return sampler
 
 
 def view_slices(data_path, slices, max_scans=24, skip=0, shape=None,
@@ -415,11 +422,11 @@ def get_oasis1_dataset_test(input_path, label_path, test_cases, max_test_cases, 
     return test_inputs, test_labels
 
 
-def prepare_oasis3_dataset(data_path, save_artefacts=False, category='train',
+def prepare_oasis3_dataset(data_path, save_path, save_artefacts=False, category='train',
         slice_min=130, slice_max=170, n=256, fmt=None, **kwargs):
     print("Preparing OASIS3 data for {}...".format(category))
     accepted_files, skipped, new_resume = get_nifti_files(data_path, **kwargs)
-    save_path = os.path.join(config.data_path, category)
+    save_path = os.path.join(save_path, category)
     utils.safe_makedirs(save_path)
 
     for i, data_file in enumerate(accepted_files):
@@ -438,36 +445,44 @@ def prepare_oasis3_dataset(data_path, save_artefacts=False, category='train',
     return accepted_files, skipped, new_resume
 
     
-def write_split(data_path, split=[('train', 80), ('test', 20)], **kwargs):
+def write_split(data_path, save_path, split=[('train', 80), ('test', 20)], **kwargs):
     data_files = get_scan_paths(data_path, 'nii', 'T1w', (1, 2))
     last_subject = None
     resume = None
     for n, m in split:
         accepted_files, skipped, resume = prepare_oasis3_dataset(
-            data_path, category=n, save_artefacts=False,
+            data_path, save_path, category=n, save_artefacts=False,
             max_scans=m, skip=0, data_files=data_files, resume=resume, 
             last_subject=last_subject, **kwargs)
         last_subject = get_subject_number(accepted_files[-1].split('/')[-1])
 
 
 def main():
-    # path = '/media/ben/ARIES/datasets/oasis3/data_full'  # raw
-    src = '/media/ben/ARIES/datasets/oasis3/exp3_png_3/ground_truth'
+    # Save artefacts
+    # src = '/media/ben/ARIES/datasets/oasis3/exp3_png_3/ground_truth'
 
-    dst = '/media/ben/ARIES/datasets/oasis3/exp3_png_3/artefact_fcs_{}'
-    for i, r in enumerate([0.18, 0.24, 0.36, 0.63]):
-        save_artefacts_from_images(src, dst.format(i), artefact_type='fractal',
-            k=1, K=0.2, r=r, ctr=1/12, two_quads=True, seed=0)
+    # dst = '/media/ben/ARIES/datasets/oasis3/exp3_png_3/artefact_fcs_{}'
+    # for i, r in enumerate([0.27, 0.66]):
+    #     save_artefacts_from_images(src, dst.format(i), artefact_type='fractal',
+    #         k=1, K=0.1, r=r, ctr=1/12, two_quads=True, seed=-1)
 
-    dst = '/media/ben/ARIES/datasets/oasis3/exp3_png_3/artefact_ocs_{}'
-    for i, r in enumerate([5.0, 4.0, 3.0, 2.0]):
-        save_artefacts_from_images(src, dst.format(i), artefact_type='cs', 
-            r=r, r_alpha=2, axis=1, acs=3, seed=0)
+    # dst = '/media/ben/ARIES/datasets/oasis3/exp3_png_3/artefact_ocs_{}'
+    # for i, r in enumerate([4.0, 2.0]):
+    #     save_artefacts_from_images(src, dst.format(i), artefact_type='cs', 
+    #         r=r, r_alpha=2, axis=1, acs=3, seed=-1)
 
     # Save data, split into categories
-    # split = [('train', 160), ('train', 40), ('test', 20)]
-    # write_split(path, split, 
+    # src = '/media/ben/ARIES/datasets/oasis3/data_full'  # raw
+    # dst = '/home/ben/honours/datasets/oasis3/exp3_png_3'
+    # split = [('train', 160), ('train', 40), ('test', 16)]
+    # write_split(src, dst, 
     #     shape=(176, 256, 256), slice_min=100, slice_max=180, n=256, fmt='png')
+
+    # Just save mask(s)
+    dst = '/media/ben/ARIES/datasets/oasis3/fractal_cs/artefact_fcs_{}'
+    # for i, r in zip([2, 4, 8], [0.66, 0.27, 0.12]):
+    save_sampling_mask(dst.format(2), 'fractal', (256, 256),
+        k=1, K=0.1, r=0.66, ctr=1/12, two_quads=True, center=False, seed=-1)
 
     # Check how many valid files there are
     # get_nifti_files(path, 1000, 0, (176, 256, 256))
