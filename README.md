@@ -1,6 +1,6 @@
 # Image artefact removal using deep convolutional neural networks
 
-Tensorflow/Keras implementation of deep convolutional neural network (CNN) models that can be used for artefact removal. In particular, this implementation was used to remove artificially-induced turbulent artefacts (see [3]) from brain MRI.
+Tensorflow/Keras implementation of deep convolutional neural network (CNN) models that can be used for artefact removal. In particular, this implementation has been used to remove artificially-induced turbulent artefacts (see [3]) from brain MRI.
 
 The conditional GAN (cGAN) model consists of a generator network and a discriminator network. The generator takes noisy/artefact images as input, with the objective of getting as close to the true image as possible. The discriminator model takes true images or generated images as input, with the objective of distinguishing the two as accurately as possible. And so the networks engage in a fierce contest for loss supremacy...
 
@@ -17,31 +17,23 @@ You can see the required Python packages listed in `environment.yml`. If you use
 
     conda env create -f environment.yml
 
-## Choose the data
-The data source is determined by setting `config.Config.data_path`.
+## Configure
+Most of the configurable parameters in the program are controlled in `config.py`. For example, `data_path` is the path to the trainin, validation and test data (by default it expects `train`, `validate`, `test` subfolders). 
 
 ## Run
 The current demo trains the cGAN to remove turbulent artefacts:
 
     python test_undersampled.py
 
-Example starting condition:
+Model parameters will be saved to a subfolder in `config.Config.model_path`, named by the datetime of the start of the program run. Optionally, intermediate summaries or test results can be saved to `config.Config.results_path` with the same naming convention.
 
-![Example starting condition](example/image_at_epoch_0000.png)
+Example result from model evaluation:
 
-Example training result:
+![Example starting condition](example/cgan_oasis1.png)
 
-![Example training result](example/image_at_epoch_0019.png)
+## Existing experiments
 
-## Training
-
-
-
-## Evaluation
-
-### Existing experiments
-
-Commit `06f6df51cd95ed8bebe77524ba8d4bde93068cfb` on branch `exp-v1` is where results were obtained for Ben Cottier's presentation to the UQ deep learning working group, summer 2018/2019.
+Commit `06f6df51cd95ed8bebe77524ba8d4bde93068cfb` on branch `exp-v1` is where results were obtained for Ben Cottier's presentation to the UQ deep learning working group, summer 2018/2019. The training data came from scans in the OASIS Brains volume 1 dataset (https://www.oasis-brains.org/), taking 5 central axial slices from each scan.
 
 - All 20 epochs
 - Full cGAN
