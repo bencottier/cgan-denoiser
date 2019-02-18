@@ -7,6 +7,7 @@ author: Ben Cottier (git: bencottier)
 """
 from config import Config as config
 import artefacts
+import data_processing
 from utils import imread
 import nibabel as nib
 import numpy as np
@@ -21,12 +22,15 @@ def load_pair(path):
 
 
 def load(path):
+    sampler = artefacts.FractalRandomSampler(K=2.4, r=0., ctr=0.)
+    sampler.generate_mask((config.train_size, config.train_size))
     for i in os.listdir(path):
-        raw_label = nib.load(os.path.join(path, i)).get_data()
-        raw_label = raw_label[np.newaxis, ...]
-        raw_input = artefacts.add_turbulence(raw_label)
-        raw_label = raw_label[..., np.newaxis]
-        raw_input = raw_input[..., np.newaxis]
+        # raw_label = nib.load(os.path.join(path, i)).get_data()  # nib
+        raw_label = imread(os.path.join(path, i))  # JPG
+        raw_label = data_processing.normalise(raw_label.astype('float32'))
+        raw_input = sampler.do_transform(raw_label)[..., :1]  # real component
+        raw_label = raw_label[np.newaxis, ..., np.newaxis]
+        raw_input = raw_input[np.newaxis, ...]
         yield (raw_label, raw_input, i)
 
 
