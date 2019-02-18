@@ -219,7 +219,7 @@ class FractalRandomSampler(Sampler):
     Terminology comes from the MRI domain, where this method has relevance.
     """
     
-    def __init__(self, k=1, K=0.1, r=0.48, ctr=1/8, two_quads=True, seed=0):
+    def __init__(self, k=1, K=0.1, r=0.48, ctr=1/8, two_quads=True, center=False, seed=0):
         """
         Arguments:
             k: 
@@ -232,7 +232,7 @@ class FractalRandomSampler(Sampler):
             seed: int. Random seed. Non-negative int for repeatable pseudo-randomness.
         """
         super(FractalRandomSampler, self).__init__(seed)
-        self.k,self.K,self.r,self.ctr,self.two_quads,self.seed = k,K,r,ctr,two_quads,seed
+        self.k,self.K,self.r,self.ctr,self.two_quads,self.center,self.seed = k,K,r,ctr,two_quads,center,seed
         
     def generate_mask(self, size):
         """
@@ -285,7 +285,8 @@ class FractalRandomSampler(Sampler):
                         count += 1
                         sampling_mask[i, j] = 1
         # Compute reduction
-        sampling_mask = fftpack.ifftshift(sampling_mask)
+        if self.center:
+            sampling_mask = fftpack.ifftshift(sampling_mask)
         self.r_actual = len(sampling_mask.flatten()) / np.sum(sampling_mask.flatten())
         self.mask = sampling_mask
         return sampling_mask.astype(np.uint32)
