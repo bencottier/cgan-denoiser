@@ -18,7 +18,7 @@ You can see the required Python packages listed in `environment.yml`. If you use
     conda env create -f environment.yml
 
 ## Configure
-Most of the configurable parameters in the program are controlled in `config.py`. For example, `data_path` is the path to the trainin, validation and test data (by default it expects `train`, `validate`, `test` subfolders). 
+Most of the configurable parameters in the program are controlled in `config.py`. For example, `data_path` is the path to the training, validation and test data (by default it expects `train`, `validate`, `test` subfolders). 
 
 ## Run
 The current demo trains the cGAN to remove turbulent artefacts:
@@ -33,7 +33,7 @@ Example result from model evaluation:
 
 ## Existing experiments
 
-Commit `06f6df51cd95ed8bebe77524ba8d4bde93068cfb` on branch `exp-v1` is where results were obtained for Ben Cottier's presentation to the UQ deep learning working group, summer 2018/2019. The training data came from scans in the OASIS Brains volume 1 dataset (https://www.oasis-brains.org/), taking 5 central axial slices from each scan.
+Commit `06f6df51cd95ed8bebe77524ba8d4bde93068cfb` on branch `exp-v1` is where results were obtained for Ben Cottier's presentation to the UQ deep learning working group, summer 2018/2019. The training data came from scans in the OASIS Brains volume 1 dataset (https://www.oasis-brains.org/), taking 5 central axial slices from each scan. Note that the latest commit is not as thoroughly tested as e.g. `3485bc5ec36bbfdf5697d92b3ae88a0a9d175ed6`, so if there are problems with training, reverting is one thing to try.
 
 - All 20 epochs
 - Full cGAN
@@ -57,8 +57,13 @@ Commit `06f6df51cd95ed8bebe77524ba8d4bde93068cfb` on branch `exp-v1` is where re
 Rerunning from above checkpoints
 - If you get weird results, check:
   - Checkpoint data file name
-  - Whether you are using the "latest checkpoint" function. For old checkpoints, specify the direct path e.g. `checkpoint.restore(os.path.join(model_path, 'ckpt-4'))`)
+  - Whether you are using the "latest checkpoint" function. For old checkpoints, specify the direct path e.g. `checkpoint.restore(os.path.join(model_path, 'ckpt-1'))`)
   - The model (is the model setup code for full cGAN, U-Net or pure GAN?)
+
+## Future work
+
+- Sigmoid cross-entropy loss functions in GANs tend to be unstable. Least-squares GAN or Wasserstein loss are alternatives to consider.
+- Quality would improve significantly with a data consistency operation on the output, which ensures the informatio from true measurements is preserved rather than the model overwriting them.
 
 ## References
 [1] Ronneberger, Olaf, Philipp Fischer, and Thomas Brox. "U-net: Convolutional networks for biomedical image segmentation." In International Conference on Medical image computing and computer-assisted intervention, pp. 234-241. Springer, Cham, 2015.
