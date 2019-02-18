@@ -1,4 +1,4 @@
-name: cgan-denoiser
+name: tf-biomed
 channels:
   - defaults
 dependencies:
@@ -22,7 +22,10 @@ dependencies:
   - pip:
     - absl-py==0.6.1
     - astor==0.7.1
+    - cloudpickle==0.8.0
     - cycler==0.10.0
+    - dask==1.1.1
+    - decorator==4.3.2
     - gast==0.2.0
     - grpcio==1.16.1
     - h5py==2.8.0
@@ -32,14 +35,23 @@ dependencies:
     - kiwisolver==1.0.1
     - markdown==3.0.1
     - matplotlib==3.0.2
+    - networkx==2.2
     - nibabel==2.3.1
     - numpy==1.15.4
     - pillow==5.3.0
     - protobuf==3.6.1
+    - pyfftw==0.11.1
     - pyparsing==2.3.0
+    - pypng==0.0.19
     - python-dateutil==2.7.5
+    - pywavelets==1.0.1
+    - scikit-image==0.14.2
+    - scipy==1.1.0
     - six==1.11.0
     - tensorboard==1.12.0
     - tensorflow-gpu==1.12.0
     - termcolor==1.1.0
+    - toolz==0.9.0
     - werkzeug==0.14.1
+prefix: /home/Student/s4360417/software/miniconda3/envs/tf-biomed
+
