@@ -73,6 +73,7 @@ def train_step(labels, inputs):
         log_metric(gen_loss, "train/loss/generator")
         log_metric(disc_loss, "train/loss/discriminator")
         # log_metric(gen_ssim, "train/accuracy/ssim")
+        log_metric(gen_rmse, "train/accuracy/rmse")
         log_metric(gen_psnr, "train/accuracy/psnr")
 
     gradients_of_generator = gen_tape.gradient(gen_loss, generator.variables)
@@ -92,6 +93,7 @@ def validate_step(labels, inputs):
     gen_abs_loss = generator_abs_loss(labels, generated_images)
     gen_loss = gen_d_loss + gen_abs_loss
     gen_psnr = data_processing.psnr(labels, generated_images, 2.)
+    gen_rmse = data_processing.rmse(labels, generated_images, 2.)
     gen_ssim = data_processing.ssim(labels, generated_images, 2.)
     disc_loss = discriminator_loss(real_output, generated_output)
 
@@ -102,6 +104,7 @@ def validate_step(labels, inputs):
     log_metric(gen_loss, "valid/loss/generator")
     log_metric(disc_loss, "valid/loss/discriminator")
     log_metric(gen_psnr, "valid/accuracy/psnr")
+    log_metric(gen_rmse, "train/accuracy/rmse")
     log_metric(gen_ssim, "valid/accuracy/ssim")
 
 
