@@ -35,12 +35,13 @@ class Config:
     n_train = 960
     n_valid = 240
     n_test = 360
-    batch_size = 5
+    batch_size = 1
     max_epoch = 20
 
     # Data storage
     save_per_epoch = max_epoch
     exp_name = 'fractal_oasis3_cgan'
-    data_path = '/home/ben/projects/honours/datasets/oasis3/exp3_png_2'
+    data_path = '/home/Student/s4360417/honours/datasets/oasis3/exp2_jpg'
+    # data_path = '/home/ben/projects/honours/datasets/oasis3/exp2_jpg'
     model_path = join('out', exp_name, 'model')
     results_path = join('out', exp_name, 'results')
