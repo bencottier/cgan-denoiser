@@ -22,7 +22,7 @@ def load_pair(path):
 
 
 def load(path):
-    sampler = artefacts.FractalRandomSampler(K=2.4, r=0., ctr=0.)
+    sampler = artefacts.FractalRandomSampler(K=2.4, r=0., ctr=0., center=True)
     sampler.generate_mask((config.train_size, config.train_size))
     for i in os.listdir(path):
         # raw_label = nib.load(os.path.join(path, i)).get_data()  # nib
