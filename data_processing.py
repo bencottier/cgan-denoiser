@@ -13,7 +13,7 @@ import nibabel as nib
 import numpy as np
 import tensorflow as tf
 from PIL import Image
-# import skimage
+from skimage.measure import compare_ssim
 import math
 import os
 
@@ -98,6 +98,7 @@ def get_shaped_output(data):
 def preprocess_train(labels, inputs, new_range=(-1, 1), current_range=None, 
                      axis=None, cropping=None, hflip=0, vflip=0, 
                      max_translate=0, max_rotate=0):
+    # TODO use a well-vetted data augmentation library
     adjust_size = (config.adjust_size, config.adjust_size)
     train_size = (config.train_size, config.train_size)
     # Resize as configured
@@ -258,19 +259,24 @@ def imbound(im, bounds=None, center=True):
     return cropped
 
 
-def mse(x1, x2, max_val):
-    error = tf.metrics.mean_squared_error(x1, x2)
-    error /= tf.square(tf.constant(max_val))
-    return error
+def mse(x1, x2, norm=2.):
+    return tf.reduce_mean(tf.square((x1 - x2) / norm))
 
 
-def rmse(x1, x2, max_val):
-    return tf.sqrt(mse(x1, x2, max_val))
+def rmse(x1, x2, norm=2.):
+    return tf.sqrt(mse(x1, x2, norm))
 
 
-def psnr(x1, x2, max_val):
-    return tf.image.psnr(x1, x2, max_val)
+def psnr(x1, x2, max_diff=2.):
+    return 20. * tf.log(1. / rmse(x1, x2, max_diff)) / tf.log(10.)
 
 
-def ssim(x1, x2, max_val):
-    return tf.image.ssim(x1, x2, max_val)
+def ssim(x1, x2, max_diff=2.):
+    try:
+        x1 = x1.numpy()
+    except: pass
+    try:
+        x2 = x2.numpy()
+    except: pass
+    x1, x2 = x1[0, :, :, 0], x2[0, :, :, 0]
+    return compare_ssim(x1, x2, data_range=max_diff)
