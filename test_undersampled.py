@@ -149,7 +149,7 @@ def test(model, dataset):
     psnr = np.zeros(config.n_test, dtype=np.float64)
     ssim = np.zeros(config.n_test)
     for i, (y, x, _) in enumerate(dataset.make_one_shot_iterator()):
-        y, x = data_processing.preprocess_train_batch(y, x)
+        y, x = data_processing.preprocess_train_batch(y.numpy(), x.numpy())
         t0 = time.time()
         prediction = generator(x, training=False)
         prediction_time[i] = time.time() - t0
@@ -237,7 +237,7 @@ def log_metric(value, name):
 
 if __name__ == '__main__':
     # Load a trained model
-    # model_path = "out/fractal_oasis1_cgan_no_disc/model/2018-12-20-12-39-54"
+    # model_path = "out/fractal_oasis3_cgan/model/2019-02-18-15-50-44"
 
     # Make directories for this run
     time_string = time.strftime("%Y-%m-%d-%H-%M-%S")
@@ -303,6 +303,7 @@ if __name__ == '__main__':
 
     # Test
     checkpoint.restore(tf.train.latest_checkpoint(model_path))
+    # checkpoint.restore(os.path.join(model_path, 'ckpt-1'))
     test(generator, test_dataset)
     # plot_samples(generator, selected_labels, selected_inputs, n_test_samples)
     # generate_and_save_images(generator, config.max_epoch + 1, selected_labels, selected_inputs)
